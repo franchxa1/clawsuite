@@ -237,7 +237,7 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
 function getMessageEventTime(msg: GatewayMessage | null | undefined): number | undefined {
   if (!msg) return undefined
   const raw = msg as Record<string, unknown>
-  for (const key of ['createdAt', 'timestamp'] as const) {
+  for (const key of ['createdAt', 'created_at', 'timestamp', 'ts', 'date'] as const) {
     const value = raw[key]
     if (typeof value === 'number' && Number.isFinite(value)) return value
     if (typeof value === 'string' && value.trim().length > 0) {
@@ -312,6 +312,25 @@ function messageMultipartSignature(msg: GatewayMessage | null | undefined): stri
         .join('|')
     : ''
   return `${msg.role ?? 'unknown'}:${content}:${attachments}`
+}
+
+function sortMessagesChronologically(
+  messages: Array<GatewayMessage>,
+): Array<GatewayMessage> {
+  return [...messages]
+    .map((message, index) => ({ message, index }))
+    .sort((a, b) => {
+      const aTime = getMessageEventTime(a.message) ?? getMessageReceiveTime(a.message)
+      const bTime = getMessageEventTime(b.message) ?? getMessageReceiveTime(b.message)
+
+      if (aTime !== undefined && bTime !== undefined && aTime !== bTime) {
+        return aTime - bTime
+      }
+      if (aTime !== undefined && bTime === undefined) return -1
+      if (aTime === undefined && bTime !== undefined) return 1
+      return a.index - b.index
+    })
+    .map(({ message }) => message)
 }
 
 export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
@@ -493,7 +512,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             __optimisticId: undefined,
             status: undefined,
           }
-          messages.set(sessionKey, sessionMessages)
+          messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
           set({ realtimeMessages: messages, lastEventAt: now })
           break
         }
@@ -516,7 +535,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
         if (duplicateIndex === -1) {
           sessionMessages.push(incomingMessage)
-          messages.set(sessionKey, sessionMessages)
+          messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
           set({ realtimeMessages: messages, lastEventAt: now })
         }
         break
@@ -864,11 +883,11 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     })
 
     if (newRealtimeMessages.length === 0) {
-      return historyMessages
+      return sortMessagesChronologically(historyMessages)
     }
 
     // Append new realtime messages to history
-    return [...historyMessages, ...newRealtimeMessages]
+    return sortMessagesChronologically([...historyMessages, ...newRealtimeMessages])
   },
 }))
 
