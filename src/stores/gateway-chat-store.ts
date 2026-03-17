@@ -714,7 +714,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
                 }
               : {}),
             __runId: event.runId ?? streaming?.runId,
-            timestamp: now,
+            timestamp: (cleanedMessage as any).timestamp ?? now,
             __streamingStatus: 'complete' as any,
             ...(streamToolCallsToEmbed ? { __streamToolCalls: streamToolCallsToEmbed } : {}),
           }
