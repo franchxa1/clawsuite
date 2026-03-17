@@ -325,6 +325,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     sendEvent('done', {
                       state,
                       errorMessage: chatPayload?.errorMessage,
+                      message: chatPayload?.message,
                       runId: chatPayload?.runId,
                     })
                     closeStream()

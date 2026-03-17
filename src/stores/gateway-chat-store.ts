@@ -234,6 +234,12 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
   )
 }
 
+function getMessageRunId(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const raw = msg as Record<string, unknown>
+  return normalizeString(raw.__runId) || normalizeString(raw.runId)
+}
+
 function getMessageEventTime(msg: GatewayMessage | null | undefined): number | undefined {
   if (!msg) return undefined
   const raw = msg as Record<string, unknown>
@@ -331,6 +337,52 @@ function sortMessagesChronologically(
       return a.index - b.index
     })
     .map(({ message }) => message)
+}
+
+function findCompleteMessageIndex(
+  sessionMessages: Array<GatewayMessage>,
+  completeMessage: GatewayMessage,
+  runId?: string,
+): number {
+  const completeId = getMessageId(completeMessage)
+  const completeNonce = getClientNonce(completeMessage)
+  const completeText = extractMessageText(completeMessage)
+  const completeRunId = normalizeString(runId) || getMessageRunId(completeMessage)
+
+  for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
+    const existing = sessionMessages[index]
+    if (existing.role !== 'assistant') continue
+
+    const existingRunId = getMessageRunId(existing)
+    if (completeRunId && existingRunId && completeRunId === existingRunId) {
+      return index
+    }
+
+    const existingId = getMessageId(existing)
+    if (completeId && existingId && completeId === existingId) {
+      return index
+    }
+
+    const existingNonce = getClientNonce(existing)
+    if (completeNonce && existingNonce && completeNonce === existingNonce) {
+      return index
+    }
+
+    const existingText = extractMessageText(existing)
+    if (completeText && existingText && completeText === existingText) {
+      return index
+    }
+
+    if (
+      completeText &&
+      existingText &&
+      (completeText.startsWith(existingText) || existingText.startsWith(completeText))
+    ) {
+      return index
+    }
+  }
+
+  return -1
 }
 
 export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
@@ -499,6 +551,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         // Mark user messages from external sources
         const incomingMessage: GatewayMessage = {
           ...normalizedMessage,
+          __runId: event.runId,
           __realtimeSource:
             event.type === 'user_message' ? (event as any).source : undefined,
           __receiveTime: incomingReceiveTime,
@@ -660,6 +713,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
                       : [{ type: 'text', text: abortedText } as TextContent],
                 }
               : {}),
+            __runId: event.runId ?? streaming?.runId,
             timestamp: now,
             __streamingStatus: 'complete' as any,
             ...(streamToolCallsToEmbed ? { __streamToolCalls: streamToolCallsToEmbed } : {}),
@@ -698,6 +752,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           completeMessage = {
             role: 'assistant',
             content,
+            __runId: event.runId ?? streaming.runId,
             timestamp: now,
             __streamingStatus: 'complete',
           }
@@ -706,43 +761,22 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
+          const existingIdx = findCompleteMessageIndex(
+            sessionMessages,
+            completeMessage,
+            event.runId ?? streaming?.runId ?? undefined,
+          )
 
-          // Deduplicate: by ID or exact content (bug #7 fix).
-          // extractMessageText handles both content-array and legacy top-level
-          // text/body/message payloads, and strips <final> tags for both.
-          const completeText = extractMessageText(completeMessage)
-          const completeId = getMessageId(completeMessage)
-          const isDuplicate = sessionMessages.some((existing) => {
-            if (existing.role !== 'assistant') return false
-            const existingId = getMessageId(existing)
-            if (completeId && existingId && completeId === existingId) return true
-            if (completeText && completeText === extractMessageText(existing)) return true
-            return false
-          })
-
-          if (!isDuplicate) {
-            sessionMessages.push(completeMessage)
-            messages.set(sessionKey, sessionMessages)
-            set({ realtimeMessages: messages })
-          } else {
-            // If there IS a duplicate (e.g. a tagged pre-final message was stored),
-            // replace it with the clean final version so the UI shows clean text.
-            const existingIdx = sessionMessages.findIndex((existing) => {
-              if (existing.role !== 'assistant') return false
-              const existingId = getMessageId(existing)
-              if (completeId && existingId && completeId === existingId) return true
-              if (completeText && completeText === extractMessageText(existing)) return true
-              return false
-            })
-            if (existingIdx >= 0) {
-              sessionMessages[existingIdx] = {
-                ...sessionMessages[existingIdx],
-                ...completeMessage,
-              }
-              messages.set(sessionKey, sessionMessages)
-              set({ realtimeMessages: messages })
+          if (existingIdx >= 0) {
+            sessionMessages[existingIdx] = {
+              ...sessionMessages[existingIdx],
+              ...completeMessage,
             }
+          } else {
+            sessionMessages.push(completeMessage)
           }
+          messages.set(sessionKey, sortMessagesChronologically(sessionMessages))
+          set({ realtimeMessages: messages })
         }
 
         // Clear streaming state immediately — tool calls are preserved via

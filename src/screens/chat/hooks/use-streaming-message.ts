@@ -412,10 +412,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const doneState = (payload as { state?: string }).state
           const errorMessage = (payload as { errorMessage?: string })
             .errorMessage
+          const message = (payload as { message?: GatewayMessage }).message
           processStoreEvent({
             type: 'done',
             state: doneState ?? 'final',
             errorMessage,
+            message,
             runId: activeRunIdRef.current ?? undefined,
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
