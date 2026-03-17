@@ -50,6 +50,7 @@ import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
 import { getConnectionErrorInfo } from '@/lib/connection-errors'
+import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 
 type ChatComposerAttachment = {
   id: string
@@ -1332,10 +1333,16 @@ function ChatComposerComponent({
   const handleAbort = useCallback(
     async function handleAbort() {
       try {
-        await fetch('/api/chat-abort', {
+        const response = await fetch('/api/chat-abort', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionKey }),
+        })
+        if (!response.ok || !sessionKey) return
+        useGatewayChatStore.getState().processEvent({
+          type: 'done',
+          state: 'aborted',
+          sessionKey,
         })
       } catch {
         // Ignore abort errors

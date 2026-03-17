@@ -121,6 +121,13 @@ const createEmptyStreamingState = (): StreamingState => ({
   toolCalls: [],
 })
 
+function finalizeAbortedText(text: string): string {
+  const trimmed = stripFinalTags(text).trim()
+  if (!trimmed) return '[aborted]'
+  if (/\[aborted\]\s*$/i.test(trimmed)) return trimmed
+  return `${trimmed} [aborted]`
+}
+
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -595,6 +602,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
       case 'done': {
         const streamingMap = new Map(state.streamingState)
         const streaming = streamingMap.get(sessionKey)
+        const isAborted = event.state === 'aborted'
 
         // Build the complete message — prefer authoritative final payload (bug #8 fix)
         let completeMessage: GatewayMessage | null = null
@@ -611,8 +619,28 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           const streamToolCallsToEmbed = streaming?.toolCalls?.length
             ? streaming.toolCalls
             : undefined
+          const abortedText = isAborted
+            ? finalizeAbortedText(extractMessageText(cleanedMessage))
+            : ''
+          const content = Array.isArray(cleanedMessage.content)
+            ? cleanedMessage.content.map((part) => {
+                if (part.type !== 'text' || !isAborted) return part
+                return {
+                  ...part,
+                  text: finalizeAbortedText(String((part as TextContent).text ?? '')),
+                }
+              })
+            : cleanedMessage.content
           completeMessage = {
             ...cleanedMessage,
+            ...(isAborted && abortedText
+              ? {
+                  content:
+                    content && content.some((part) => part.type === 'text')
+                      ? content
+                      : [{ type: 'text', text: abortedText } as TextContent],
+                }
+              : {}),
             timestamp: now,
             __streamingStatus: 'complete' as any,
             ...(streamToolCallsToEmbed ? { __streamToolCalls: streamToolCallsToEmbed } : {}),
@@ -633,7 +661,9 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           if (cleanStreamText) {
             content.push({
               type: 'text',
-              text: cleanStreamText,
+              text: isAborted
+                ? finalizeAbortedText(cleanStreamText)
+                : cleanStreamText,
             } as TextContent)
           }
 
