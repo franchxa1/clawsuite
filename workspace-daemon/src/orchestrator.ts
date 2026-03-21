@@ -1,7 +1,6 @@
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { execSync } from "node:child_process";
 import { AgentRunner } from "./agent-runner";
 import { Scheduler } from "./scheduler";
 import { Tracker } from "./tracker";

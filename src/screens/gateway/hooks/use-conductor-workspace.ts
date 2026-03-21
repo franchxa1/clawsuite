@@ -62,6 +62,7 @@ export type WorkspaceTaskRun = {
   session_label?: string | null
   agent_id?: string | null
   agent_name?: string | null
+  error?: string | null
 }
 
 export type WorkspaceCheckpoint = {
@@ -231,10 +232,16 @@ function parseTaskRuns(payload: unknown): WorkspaceTaskRun[] {
         session_label: asString(r.session_label),
         agent_id: asString(r.agent_id),
         agent_name: asString(r.agent_name),
+        error: asString(r.error),
       }
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
 }
+
+const RESILIENT_QUERY_OPTIONS = {
+  retry: 3,
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000),
+} as const
 
 function parseCheckpoints(payload: unknown): WorkspaceCheckpoint[] {
   const unwrap = (data: unknown): unknown[] => {
@@ -477,6 +484,7 @@ export function useConductorWorkspace(options?: {
         await workspaceJson(`/api/workspace/missions/${encodeURIComponent(missionId!)}/status`),
       ),
     refetchInterval: 3_000,
+    ...RESILIENT_QUERY_OPTIONS,
   })
 
   const taskRunsQuery = useQuery({
@@ -489,6 +497,7 @@ export function useConductorWorkspace(options?: {
         ),
       ),
     refetchInterval: 5_000,
+    ...RESILIENT_QUERY_OPTIONS,
   })
 
   const checkpointsQuery = useQuery({
@@ -501,6 +510,7 @@ export function useConductorWorkspace(options?: {
         ),
       ),
     refetchInterval: 5_000,
+    ...RESILIENT_QUERY_OPTIONS,
   })
 
   const statsQuery = useQuery({
@@ -508,6 +518,7 @@ export function useConductorWorkspace(options?: {
     enabled,
     queryFn: async () => workspaceJson<Record<string, unknown>>('/api/workspace/stats'),
     refetchInterval: 10_000,
+    ...RESILIENT_QUERY_OPTIONS,
   })
 
   // ── Convenience: full launch sequence ────────────────────────────────────

@@ -110,7 +110,7 @@ function getTaskStatusDot(status: string): { dotClass: string; label: string } {
 
 export function Conductor() {
   // ── Workspace connection ──────────────────────────────────────────────────
-  const { connected } = useWorkspaceSse()
+  const { connected } = useWorkspaceSse({ silent: true })
 
   // ── Local state ───────────────────────────────────────────────────────────
   const [goalDraft, setGoalDraft] = useState('')
@@ -119,6 +119,7 @@ export function Conductor() {
   const [activeMissionId, setActiveMissionId] = useState<string | null>(null)
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const [terminalExpanded, setTerminalExpanded] = useState(false)
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -157,6 +158,7 @@ export function Conductor() {
   const handleDecompose = useCallback(async () => {
     const trimmed = goalDraft.trim()
     if (!trimmed) return
+    setLaunchError(null)
     try {
       const result = await workspace.decompose.mutateAsync(trimmed)
       setDecomposedTasks(result.tasks.map((t) => ({ ...t, enabled: true })))
@@ -170,6 +172,7 @@ export function Conductor() {
     if (!decomposedTasks) return
     const enabled = decomposedTasks.filter((t) => t.enabled)
     if (enabled.length === 0) return
+    setLaunchError(null)
     try {
       const result = await workspace.launchMission({
         goal: goalDraft.trim(),
@@ -179,6 +182,7 @@ export function Conductor() {
       setActiveProjectId(result.projectId)
       setDecomposedTasks(null)
     } catch (err) {
+      setLaunchError(err instanceof Error ? err.message : 'Failed to launch mission')
       console.error('Launch failed:', err)
     }
   }, [decomposedTasks, goalDraft, workspace])
@@ -204,6 +208,7 @@ export function Conductor() {
     setGoalDraft('')
     setSelectedAction('build')
     setSelectedTaskId(null)
+    setLaunchError(null)
   }, [])
 
   const handleBackToHome = useCallback(async () => {
@@ -232,6 +237,13 @@ export function Conductor() {
   const pendingCheckpoints = useMemo(
     () => checkpoints.filter((c) => c.status === 'pending' || c.status === 'awaiting_review'),
     [checkpoints],
+  )
+  const failedTaskRuns = useMemo(
+    () =>
+      taskRuns.filter(
+        (run) => run.status === 'failed' && typeof run.error === 'string' && run.error.trim().length > 0,
+      ),
+    [taskRuns],
   )
 
   // ── Live output from workspace SSE (task_run.output events) ───────────────
@@ -266,6 +278,8 @@ export function Conductor() {
       if (!expandedCheckpointId) return { diff: '' }
       return getWorkspaceCheckpointDiff(expandedCheckpointId)
     },
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -320,21 +334,14 @@ export function Conductor() {
                 </div>
                 <Button
                   onClick={() => void handleDecompose()}
-                  disabled={!goalDraft.trim() || workspace.decompose.isPending}
+                  disabled={!connected || !goalDraft.trim() || workspace.decompose.isPending}
                   className="min-w-[140px] rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
                 >
-                  {workspace.decompose.isPending ? 'Analyzing…' : 'Plan Mission'}
+                  {!connected ? 'Connecting...' : workspace.decompose.isPending ? 'Planning...' : 'Plan Mission'}
                   <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
                 </Button>
               </div>
             </section>
-
-            {/* Connection status */}
-            {!connected && (
-              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                Workspace daemon offline — start it with <code className="rounded bg-amber-500/20 px-1 font-mono text-xs">npm run daemon</code>
-              </div>
-            )}
           </div>
         </main>
       </div>
@@ -396,13 +403,22 @@ export function Conductor() {
               </button>
               <Button
                 onClick={() => void handleLaunch()}
-                disabled={enabledCount === 0 || workspace.createMission.isPending || workspace.startMission.isPending}
+                disabled={!connected || enabledCount === 0 || workspace.createMission.isPending || workspace.startMission.isPending}
                 className="min-w-[160px] rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
               >
-                {workspace.createMission.isPending || workspace.startMission.isPending ? 'Launching…' : `Launch ${enabledCount} Task${enabledCount !== 1 ? 's' : ''}`}
+                {!connected
+                  ? 'Connecting...'
+                  : workspace.createMission.isPending || workspace.startMission.isPending
+                    ? 'Launching...'
+                    : `Launch ${enabledCount} Task${enabledCount !== 1 ? 's' : ''}`}
                 <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.7} />
               </Button>
             </div>
+            {launchError && (
+              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {launchError}
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -444,6 +460,22 @@ export function Conductor() {
                   {tasks.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No task data available.</p>}
                 </div>
               </div>
+
+              {failed && failedTaskRuns.length > 0 && (
+                <div className="rounded-3xl border border-red-500/30 bg-red-500/10 p-6">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-red-300">Failure Details</h2>
+                  <div className="mt-4 space-y-3">
+                    {failedTaskRuns.map((run) => (
+                      <div key={run.id} className="rounded-2xl bg-red-950/10 px-4 py-3">
+                        <p className="text-sm font-medium text-[var(--theme-text)]">
+                          {run.task_name ?? 'Task'}{run.agent_name ? ` · ${run.agent_name}` : ''}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-red-200">{run.error}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Checkpoints */}
               {checkpoints.length > 0 && (

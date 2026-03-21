@@ -61,11 +61,12 @@ function getOutputLines(payload: Record<string, unknown>): string[] {
     .filter(Boolean)
 }
 
-export function useWorkspaceSse() {
+export function useWorkspaceSse(options?: { silent?: boolean }) {
   const queryClient = useQueryClient()
   const [connected, setConnected] = useState(false)
   const hasConnectedRef = useRef(false)
   const disconnectToastShownRef = useRef(false)
+  const silent = options?.silent === true
 
   useEffect(() => {
     let eventSource: EventSource | null = null
@@ -96,7 +97,7 @@ export function useWorkspaceSse() {
 
       es.onopen = () => {
         if (disposed) return
-        if (hasConnectedRef.current && disconnectToastShownRef.current) {
+        if (!silent && hasConnectedRef.current && disconnectToastShownRef.current) {
           toast('Workspace daemon reconnected', { type: 'success' })
         }
         hasConnectedRef.current = true
@@ -230,7 +231,7 @@ export function useWorkspaceSse() {
 
       es.onerror = () => {
         if (disposed) return
-        if (hasConnectedRef.current && !disconnectToastShownRef.current) {
+        if (!silent && hasConnectedRef.current && !disconnectToastShownRef.current) {
           disconnectToastShownRef.current = true
           toast('Workspace daemon disconnected — reconnecting...', {
             type: 'warning',
@@ -253,7 +254,7 @@ export function useWorkspaceSse() {
       eventSource?.close()
       eventSource = null
     }
-  }, [queryClient])
+  }, [queryClient, silent])
 
   return { connected }
 }
