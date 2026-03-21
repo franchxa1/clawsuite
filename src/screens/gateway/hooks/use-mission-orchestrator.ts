@@ -511,6 +511,23 @@ export function useMissionOrchestrator() {
     return currentMap
   }, [attachSessionStream, setAgentStatus, spawnAgentSession])
 
+  const reconnectMission = useCallback((mission: ActiveMission) => {
+    missionRef.current = mission
+    sessionMapRef.current = { ...mission.agentSessionMap }
+    completedSessionKeysRef.current = new Set()
+
+    mission.team.forEach((member) => {
+      const sessionKey = mission.agentSessionMap[member.id]
+      if (!sessionKey) return
+      setAgentStatus(member.id, {
+        status: mission.state === 'paused' ? 'idle' : 'dispatching',
+        lastSeen: Date.now(),
+        lastMessage: mission.state === 'paused' ? 'Mission restored (paused)' : 'Reconnecting session',
+      })
+      attachSessionStream(member.id, sessionKey)
+    })
+  }, [attachSessionStream, setAgentStatus])
+
   const dispatchMission = useCallback(async (mission: ActiveMission) => {
     dispatchTokenRef.current = mission.id
     missionRef.current = mission
@@ -1012,6 +1029,7 @@ export function useMissionOrchestrator() {
 
   return {
     dispatchMission,
+    reconnectMission,
     agentSessionStatus,
     isDispatching,
     retryAgent,

@@ -1,0 +1,522 @@
+/**
+ * use-conductor-workspace.ts
+ *
+ * Encapsulates all Workspace daemon API calls for the Conductor UI.
+ * Conductor uses the Workspace daemon (:3099) as its backend for:
+ *   - Goal decomposition (LLM-powered task breakdown)
+ *   - Mission lifecycle (create, start, pause, resume, stop)
+ *   - Live status polling (mission progress, task runs)
+ *   - Checkpoint management (approve, reject, merge)
+ *
+ * This hook does NOT touch the client-side mission-store or orchestrator.
+ * All state lives in the daemon's SQLite DB + SSE event stream.
+ */
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export type DecomposeResult = {
+  tasks: Array<{
+    title: string
+    description: string
+    agent?: string
+  }>
+}
+
+export type WorkspaceMissionTask = {
+  id: string
+  name: string
+  status: string
+  agent_id?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+}
+
+export type WorkspaceMissionStatus = {
+  mission: {
+    id: string
+    name: string
+    status: string
+    progress: number
+  }
+  task_breakdown: WorkspaceMissionTask[]
+  running_agents: string[]
+  completed_count: number
+  total_count: number
+  estimated_completion: string | null
+}
+
+export type WorkspaceTaskRun = {
+  id: string
+  task_id: string
+  task_name?: string
+  mission_id?: string
+  mission_name?: string
+  project_id?: string
+  status: string
+  started_at?: string | null
+  completed_at?: string | null
+  session_id?: string | null
+  session_label?: string | null
+  agent_id?: string | null
+  agent_name?: string | null
+}
+
+export type WorkspaceCheckpoint = {
+  id: string
+  task_run_id?: string
+  status: string
+  diff_summary?: string
+  created_at: string
+  files_changed?: number
+  additions?: number
+  deletions?: number
+}
+
+export type WorkspaceProject = {
+  id: string
+  name: string
+  path?: string
+  status: string
+}
+
+// ── API helpers ──────────────────────────────────────────────────────────────
+
+async function workspaceJson<T = unknown>(
+  input: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(input, init)
+  const text = await response.text()
+
+  let parsed: unknown = null
+  try {
+    parsed = text ? JSON.parse(text) : null
+  } catch {
+    parsed = text
+  }
+
+  if (response.ok) return parsed as T
+
+  const record =
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null
+  throw new Error(
+    (typeof record?.error === 'string' && record.error) ||
+      (typeof record?.message === 'string' && record.message) ||
+      `Request failed (${response.status})`,
+  )
+}
+
+async function workspacePost(input: string, body?: unknown): Promise<unknown> {
+  return workspaceJson(input, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : '{}',
+  })
+}
+
+// ── Parsers ──────────────────────────────────────────────────────────────────
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function parseDecomposeResult(payload: unknown): DecomposeResult {
+  const record = asRecord(payload)
+  const tasks = Array.isArray(record?.tasks) ? record.tasks : []
+  return {
+    tasks: tasks
+      .map((item) => {
+        const r = asRecord(item)
+        if (!r) return null
+        const title = asString(r.title) ?? asString(r.name) ?? ''
+        if (!title) return null
+        return {
+          title,
+          description: asString(r.description) ?? '',
+          agent: asString(r.agent) ?? undefined,
+        }
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null),
+  }
+}
+
+function parseMissionStatus(payload: unknown): WorkspaceMissionStatus | null {
+  const record = asRecord(payload)
+  const mission = asRecord(record?.mission)
+  if (!mission) return null
+
+  const taskBreakdown = Array.isArray(record?.task_breakdown)
+    ? record.task_breakdown
+        .map((task) => {
+          const r = asRecord(task)
+          if (!r) return null
+          return {
+            id: asString(r.id) ?? crypto.randomUUID(),
+            name: asString(r.name) ?? 'Untitled task',
+            status: asString(r.status) ?? 'pending',
+            agent_id: asString(r.agent_id),
+            started_at: asString(r.started_at),
+            completed_at: asString(r.completed_at),
+          }
+        })
+        .filter((t): t is NonNullable<typeof t> => t !== null)
+    : []
+
+  return {
+    mission: {
+      id: asString(mission.id) ?? '',
+      name: asString(mission.name) ?? 'Mission',
+      status: asString(mission.status) ?? 'pending',
+      progress: Math.max(0, Math.min(100, asNumber(mission.progress) ?? 0)),
+    },
+    task_breakdown: taskBreakdown,
+    running_agents: Array.isArray(record?.running_agents)
+      ? record.running_agents.filter((v): v is string => typeof v === 'string')
+      : [],
+    completed_count: Math.max(0, asNumber(record?.completed_count) ?? 0),
+    total_count: Math.max(0, asNumber(record?.total_count) ?? taskBreakdown.length),
+    estimated_completion: asString(record?.estimated_completion),
+  }
+}
+
+function parseTaskRuns(payload: unknown): WorkspaceTaskRun[] {
+  const unwrap = (data: unknown): unknown[] => {
+    if (Array.isArray(data)) return data
+    const record = asRecord(data)
+    const candidates = [record?.task_runs, record?.runs, record?.data, record?.items]
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c
+    }
+    return []
+  }
+
+  return unwrap(payload)
+    .map((item) => {
+      const r = asRecord(item)
+      if (!r) return null
+      return {
+        id: asString(r.id) ?? crypto.randomUUID(),
+        task_id: asString(r.task_id) ?? '',
+        task_name: asString(r.task_name) ?? undefined,
+        mission_id: asString(r.mission_id) ?? undefined,
+        mission_name: asString(r.mission_name) ?? undefined,
+        project_id: asString(r.project_id) ?? undefined,
+        status: asString(r.status) ?? 'pending',
+        started_at: asString(r.started_at),
+        completed_at: asString(r.completed_at),
+        session_id: asString(r.session_id),
+        session_label: asString(r.session_label),
+        agent_id: asString(r.agent_id),
+        agent_name: asString(r.agent_name),
+      }
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+}
+
+function parseCheckpoints(payload: unknown): WorkspaceCheckpoint[] {
+  const unwrap = (data: unknown): unknown[] => {
+    if (Array.isArray(data)) return data
+    const record = asRecord(data)
+    const candidates = [record?.checkpoints, record?.data, record?.items]
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c
+    }
+    return []
+  }
+
+  return unwrap(payload)
+    .map((item) => {
+      const r = asRecord(item)
+      if (!r) return null
+      return {
+        id: asString(r.id) ?? crypto.randomUUID(),
+        task_run_id: asString(r.task_run_id) ?? undefined,
+        status: asString(r.status) ?? 'pending',
+        diff_summary: asString(r.diff_summary) ?? undefined,
+        created_at: asString(r.created_at) ?? new Date().toISOString(),
+        files_changed: asNumber(r.files_changed) ?? undefined,
+        additions: asNumber(r.additions) ?? undefined,
+        deletions: asNumber(r.deletions) ?? undefined,
+      }
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+}
+
+function parseProject(payload: unknown): WorkspaceProject | null {
+  const record = asRecord(payload)
+  const project = asRecord(record?.project) ?? record
+  if (!project) return null
+  const id = asString(project.id)
+  if (!id) return null
+  return {
+    id,
+    name: asString(project.name) ?? 'Untitled',
+    path: asString(project.path) ?? undefined,
+    status: asString(project.status) ?? 'ready',
+  }
+}
+
+// ── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useConductorWorkspace(options?: {
+  missionId?: string | null
+  projectId?: string | null
+  enabled?: boolean
+}) {
+  const queryClient = useQueryClient()
+  const missionId = options?.missionId ?? null
+  const projectId = options?.projectId ?? null
+  const enabled = options?.enabled !== false
+
+  // ── Decompose mutation ───────────────────────────────────────────────────
+  const decomposeMutation = useMutation({
+    mutationFn: async (goal: string) => {
+      const payload = await workspacePost('/api/workspace/decompose', {
+        goal,
+        ...(projectId ? { project_id: projectId } : {}),
+      })
+      return parseDecomposeResult(payload)
+    },
+  })
+
+  // ── Create project mutation ──────────────────────────────────────────────
+  const createProjectMutation = useMutation({
+    mutationFn: async (params: { name: string; path?: string }) => {
+      const payload = await workspacePost('/api/workspace/projects', params)
+      return parseProject(payload)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'projects'] })
+    },
+  })
+
+  // ── Create mission mutation ──────────────────────────────────────────────
+  const createMissionMutation = useMutation({
+    mutationFn: async (params: {
+      name: string
+      project_id: string
+      tasks?: Array<{ name: string; description?: string; agent_id?: string }>
+    }) => {
+      const payload = await workspacePost('/api/workspace/missions', params)
+      const record = asRecord(payload)
+      const id =
+        asString(record?.id) ??
+        asString((asRecord(record?.mission))?.id) ??
+        ''
+      return { id, ...(record ?? {}) }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'missions'] })
+    },
+  })
+
+  // ── Start mission mutation ───────────────────────────────────────────────
+  const startMissionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await workspacePost(`/api/workspace/missions/${encodeURIComponent(id)}/start`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    },
+  })
+
+  // ── Mission lifecycle mutations ──────────────────────────────────────────
+  const pauseMissionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await workspacePost(`/api/workspace/missions/${encodeURIComponent(id)}/pause`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    },
+  })
+
+  const resumeMissionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await workspacePost(`/api/workspace/missions/${encodeURIComponent(id)}/resume`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    },
+  })
+
+  const stopMissionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await workspacePost(`/api/workspace/missions/${encodeURIComponent(id)}/stop`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    },
+  })
+
+  // ── Task run mutations ───────────────────────────────────────────────────
+  const stopTaskRunMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      await workspacePost(`/api/workspace/task-runs/${encodeURIComponent(runId)}/stop`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'task-runs'] })
+    },
+  })
+
+  const retryTaskRunMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      await workspacePost(`/api/workspace/task-runs/${encodeURIComponent(runId)}/retry`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'task-runs'] })
+    },
+  })
+
+  // ── Checkpoint mutations ─────────────────────────────────────────────────
+  const approveCheckpointMutation = useMutation({
+    mutationFn: async (params: { id: string; action?: 'approve' | 'commit' | 'merge' | 'pr' }) => {
+      const suffix = params.action === 'commit'
+        ? '/approve-and-commit'
+        : params.action === 'merge'
+          ? '/approve-and-merge'
+          : params.action === 'pr'
+            ? '/approve-and-pr'
+            : '/approve'
+      await workspacePost(`/api/workspace/checkpoints/${encodeURIComponent(params.id)}${suffix}`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'checkpoints'] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'stats'] })
+    },
+  })
+
+  const rejectCheckpointMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await workspacePost(`/api/workspace/checkpoints/${encodeURIComponent(id)}/reject`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'checkpoints'] })
+    },
+  })
+
+  // ── Queries (only when mission is active) ────────────────────────────────
+
+  const missionStatusQuery = useQuery({
+    queryKey: ['workspace', 'conductor', 'mission-status', missionId],
+    enabled: enabled && Boolean(missionId),
+    queryFn: async () =>
+      parseMissionStatus(
+        await workspaceJson(`/api/workspace/missions/${encodeURIComponent(missionId!)}/status`),
+      ),
+    refetchInterval: 3_000,
+  })
+
+  const taskRunsQuery = useQuery({
+    queryKey: ['workspace', 'conductor', 'task-runs', missionId],
+    enabled: enabled && Boolean(missionId),
+    queryFn: async () =>
+      parseTaskRuns(
+        await workspaceJson(
+          `/api/workspace/task-runs${missionId ? `?mission_id=${encodeURIComponent(missionId)}` : ''}`,
+        ),
+      ),
+    refetchInterval: 5_000,
+  })
+
+  const checkpointsQuery = useQuery({
+    queryKey: ['workspace', 'conductor', 'checkpoints', missionId],
+    enabled: enabled && Boolean(missionId),
+    queryFn: async () =>
+      parseCheckpoints(
+        await workspaceJson(
+          `/api/workspace/checkpoints${missionId ? `?mission_id=${encodeURIComponent(missionId)}` : ''}`,
+        ),
+      ),
+    refetchInterval: 5_000,
+  })
+
+  const statsQuery = useQuery({
+    queryKey: ['workspace', 'stats'],
+    enabled,
+    queryFn: async () => workspaceJson<Record<string, unknown>>('/api/workspace/stats'),
+    refetchInterval: 10_000,
+  })
+
+  // ── Convenience: full launch sequence ────────────────────────────────────
+
+  const launchMission = useCallback(
+    async (params: {
+      goal: string
+      projectName?: string
+      projectPath?: string
+      tasks: Array<{ title: string; description?: string; agent?: string }>
+    }) => {
+      // 1. Create or reuse project
+      let resolvedProjectId = projectId
+      if (!resolvedProjectId) {
+        const project = await createProjectMutation.mutateAsync({
+          name: params.projectName ?? params.goal.slice(0, 64),
+          path: params.projectPath,
+        })
+        resolvedProjectId = project?.id ?? null
+      }
+      if (!resolvedProjectId) throw new Error('Failed to create project')
+
+      // 2. Create mission with tasks
+      const mission = await createMissionMutation.mutateAsync({
+        name: params.goal.slice(0, 120),
+        project_id: resolvedProjectId,
+        tasks: params.tasks.map((t) => ({
+          name: t.title,
+          description: t.description,
+          agent_id: t.agent,
+        })),
+      })
+      if (!mission.id) throw new Error('Failed to create mission')
+
+      // 3. Start mission
+      await startMissionMutation.mutateAsync(mission.id)
+
+      return { missionId: mission.id, projectId: resolvedProjectId }
+    },
+    [createMissionMutation, createProjectMutation, projectId, startMissionMutation],
+  )
+
+  // ── Return ───────────────────────────────────────────────────────────────
+
+  return {
+    // Mutations
+    decompose: decomposeMutation,
+    createProject: createProjectMutation,
+    createMission: createMissionMutation,
+    startMission: startMissionMutation,
+    pauseMission: pauseMissionMutation,
+    resumeMission: resumeMissionMutation,
+    stopMission: stopMissionMutation,
+    stopTaskRun: stopTaskRunMutation,
+    retryTaskRun: retryTaskRunMutation,
+    approveCheckpoint: approveCheckpointMutation,
+    rejectCheckpoint: rejectCheckpointMutation,
+    launchMission,
+
+    // Queries
+    missionStatus: missionStatusQuery,
+    taskRuns: taskRunsQuery,
+    checkpoints: checkpointsQuery,
+    stats: statsQuery,
+
+    // Helpers
+    invalidateAll: useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    }, [queryClient]),
+  }
+}

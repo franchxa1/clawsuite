@@ -9,37 +9,29 @@ import {
   Search01Icon,
   TaskDone01Icon,
 } from '@hugeicons/core-free-icons'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TEAM_TEMPLATES, type TeamMember } from './components/team-panel'
-import { RunConsole } from './components/run-console'
-import { ApprovalsBell } from './components/approvals-bell'
-import { AgentOutputPanel } from './components/agent-output-panel'
-import { ExportMissionButton } from './components/export-mission'
 import { TerminalWorkspace } from '@/components/terminal/terminal-workspace'
-import { useMissionStore } from '@/stores/mission-store'
-import { loadApprovals, saveApprovals, type ApprovalRequest } from './lib/approvals-store'
-import { buildStoredMissionReportFromCheckpoint, loadStoredMissionReports } from './components/hub-utils'
-import type { StoredMissionReport } from './components/hub-constants'
-import type { HubTask } from './components/task-board'
-import { useMissionOrchestrator } from './hooks/use-mission-orchestrator'
+import { AgentOutputPanel } from './components/agent-output-panel'
+import { useWorkspaceSse } from '@/hooks/use-workspace-sse'
+import { getWorkspaceCheckpointDiff } from '@/lib/workspace-checkpoints'
+import { useConductorWorkspace, type WorkspaceMissionTask } from './hooks/use-conductor-workspace'
 
-type ConductorPhase = 'home' | 'active' | 'complete'
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
 type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
 
-type RecentMissionEntry = {
-  id: string
+type DecomposedTask = {
   title: string
-  subtitle: string
-  status: 'active' | 'done' | 'idle'
-  timestamp: number
+  description: string
+  agent?: string
+  enabled: boolean
 }
 
-/* Theme uses existing CSS custom properties from styles.css.
-   --color-surface, --color-ink, --color-primary-*, --color-accent-*
-   adapt automatically to light / dark mode. The aliases below map
-   the conductor's internal names to the app-wide tokens so every
-   panel respects the user's current preference. */
+// ── Theme (CSS custom properties — adapts to light/dark) ─────────────────────
+
 const THEME_STYLE: CSSProperties = {
   ['--theme-bg' as string]: 'var(--color-surface)',
   ['--theme-card' as string]: 'var(--color-primary-50)',
@@ -57,95 +49,47 @@ const THEME_STYLE: CSSProperties = {
   ['--theme-shadow' as string]: 'color-mix(in srgb, var(--color-primary-950) 14%, transparent)',
 }
 
+// ── Quick Actions ────────────────────────────────────────────────────────────
+
 const QUICK_ACTIONS: Array<{
   id: QuickActionId
   label: string
   icon: typeof Search01Icon
   prompt: string
-  templateId: (typeof TEAM_TEMPLATES)[number]['id']
 }> = [
   {
     id: 'research',
     label: 'Research',
     icon: Search01Icon,
     prompt: 'Research the problem space, gather constraints, compare approaches, and propose the most viable plan.',
-    templateId: 'research',
   },
   {
     id: 'build',
     label: 'Build',
     icon: PlayIcon,
     prompt: 'Build the requested feature end-to-end, including implementation, validation, and a concise delivery summary.',
-    templateId: 'coding',
   },
   {
     id: 'review',
     label: 'Review',
     icon: TaskDone01Icon,
     prompt: 'Review the current implementation for correctness, regressions, missing tests, and release risks.',
-    templateId: 'coding',
   },
   {
     id: 'deploy',
     label: 'Deploy',
     icon: Rocket01Icon,
     prompt: 'Prepare the work for deployment, verify readiness, and summarize any operational follow-ups.',
-    templateId: 'content',
   },
 ]
 
-function createId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function createTeamFromTemplate(templateId: (typeof TEAM_TEMPLATES)[number]['id']): TeamMember[] {
-  const template = TEAM_TEMPLATES.find((entry) => entry.id === templateId) ?? TEAM_TEMPLATES[1]
-  return template.agents.map((name, index) => ({
-    id: createId(`agent-${index + 1}`),
-    name,
-    modelId: index === 0 ? 'codex' : 'auto',
-    roleDescription: `${name} drives ${template.name.toLowerCase()} work.`,
-    goal: '',
-    backstory: '',
-    status: 'available',
-  }))
-}
-
-function createInitialTasks(goal: string, team: TeamMember[]): HubTask[] {
-  const taskTitles = [
-    'Clarify mission scope',
-    'Execute primary workstream',
-    'Review and finalize output',
-  ]
-  const now = Date.now()
-  return taskTitles.map((title, index) => ({
-    id: createId(`task-${index + 1}`),
-    title,
-    description: `${title} for: ${goal}`,
-    priority: index === 1 ? 'high' : 'normal',
-    status: index === 0 ? 'in_progress' : 'inbox',
-    agentId: team[index]?.id,
-    createdAt: now + index,
-    updatedAt: now + index,
-  }))
-}
-
-function formatRelativeTime(timestamp: number): string {
-  const delta = Math.max(0, Date.now() - timestamp)
-  const minutes = Math.floor(delta / 60_000)
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
-function formatElapsedTime(timestamp: number, now: number): string {
-  const totalSeconds = Math.max(0, Math.floor((now - timestamp) / 1000))
+function formatElapsedTime(startIso: string | null | undefined, now: number): string {
+  if (!startIso) return '0s'
+  const startMs = new Date(startIso).getTime()
+  if (!Number.isFinite(startMs)) return '0s'
+  const totalSeconds = Math.max(0, Math.floor((now - startMs) / 1000))
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
@@ -154,406 +98,211 @@ function formatElapsedTime(timestamp: number, now: number): string {
   return `${seconds}s`
 }
 
-function getAgentStatusPresentation(status?: string): { dotClass: string; pulseClass?: string; label: string } {
-  if (status === 'active') {
-    return {
-      dotClass: 'bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.45)]',
-      pulseClass: 'bg-emerald-400/60',
-      label: 'Working',
-    }
-  }
-  if (status === 'dispatching') {
-    return {
-      dotClass: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.4)]',
-      label: 'Dispatching',
-    }
-  }
-  if (status === 'error') {
-    return {
-      dotClass: 'bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.35)]',
-      label: 'Error',
-    }
-  }
-  if (status === 'waiting_for_input') {
-    return {
-      dotClass: 'bg-amber-400',
-      label: 'Waiting',
-    }
-  }
-  if (status === 'stopped') {
-    return {
-      dotClass: 'bg-[var(--theme-border2)]',
-      label: 'Stopped',
-    }
-  }
-  return {
-    dotClass: 'bg-[var(--theme-border2)]',
-    label: 'Idle',
-  }
+function getTaskStatusDot(status: string): { dotClass: string; label: string } {
+  if (status === 'completed' || status === 'done') return { dotClass: 'bg-emerald-400', label: 'Done' }
+  if (status === 'running' || status === 'active') return { dotClass: 'bg-sky-400 animate-pulse', label: 'Running' }
+  if (status === 'failed' || status === 'stopped') return { dotClass: 'bg-red-400', label: 'Failed' }
+  if (status === 'paused') return { dotClass: 'bg-amber-400', label: 'Paused' }
+  return { dotClass: 'bg-[var(--theme-border2)]', label: 'Pending' }
 }
 
-function getPhase(activeMission: ReturnType<typeof useMissionStore.getState>['activeMission']): ConductorPhase {
-  if (!activeMission) return 'home'
-  if (activeMission.state === 'completed' || activeMission.state === 'aborted') return 'complete'
-  return 'active'
-}
-
-function buildRecentMissionEntries(
-  activeMission: ReturnType<typeof useMissionStore.getState>['activeMission'],
-  historyReports: ReturnType<typeof useMissionStore.getState>['missionHistory']['reports'],
-  storedReports: StoredMissionReport[],
-): RecentMissionEntry[] {
-  const items: RecentMissionEntry[] = []
-
-  if (activeMission) {
-    items.push({
-      id: activeMission.id,
-      title: activeMission.name || activeMission.goal || 'Untitled mission',
-      subtitle: activeMission.goal || `${activeMission.team.length} active agents`,
-      status: activeMission.state === 'completed' ? 'done' : 'active',
-      timestamp: activeMission.startedAt,
-    })
-  }
-
-  historyReports.forEach((checkpoint) => {
-    items.push({
-      id: checkpoint.id,
-      title: checkpoint.name || checkpoint.label || checkpoint.goal || 'Untitled mission',
-      subtitle: checkpoint.goal || `${checkpoint.team.length} agents`,
-      status: checkpoint.status === 'completed' ? 'done' : 'idle',
-      timestamp: checkpoint.completedAt ?? checkpoint.updatedAt,
-    })
-  })
-
-  storedReports.forEach((report) => {
-    items.push({
-      id: report.missionId ?? report.id,
-      title: report.name || report.goal || 'Untitled mission',
-      subtitle: report.goal || report.teamName,
-      status: 'done',
-      timestamp: report.completedAt,
-    })
-  })
-
-  const deduped = new Map<string, RecentMissionEntry>()
-  items
-    .sort((left, right) => right.timestamp - left.timestamp)
-    .forEach((item) => {
-      if (!deduped.has(item.id)) deduped.set(item.id, item)
-    })
-
-  return Array.from(deduped.values()).slice(0, 6)
-}
-
-function buildSummary(activeMission: NonNullable<ReturnType<typeof useMissionStore.getState>['activeMission']>): string[] {
-  const totalTasks = activeMission.tasks.length
-  const completedTasks = activeMission.tasks.filter((task) => task.status === 'done').length
-  return [
-    `${activeMission.team.length} agents participated in this mission.`,
-    `${completedTasks} of ${totalTasks} tasks reached done state.`,
-    activeMission.artifacts.length > 0
-      ? `${activeMission.artifacts.length} artifacts were captured during execution.`
-      : 'No artifacts were captured for this run.',
-  ]
-}
-
-function formatCompactCost(value?: number): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '$0.00'
-  return `$${value.toFixed(2)}`
-}
-
-function getTaskColumnMeta(status: HubTask['status']): { label: string; dotClass: string } {
-  if (status === 'done') return { label: 'Done', dotClass: 'bg-emerald-400' }
-  if (status === 'review') return { label: 'Review', dotClass: 'bg-amber-400' }
-  if (status === 'assigned' || status === 'in_progress') return { label: 'In Progress', dotClass: 'bg-sky-400' }
-  return { label: 'Backlog', dotClass: 'bg-[var(--theme-border2)]' }
-}
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function Conductor() {
-  const activeMission = useMissionStore((s) => s.activeMission)
-  const missionState = useMissionStore((s) => s.missionState)
-  const missionHistory = useMissionStore((s) => s.missionHistory)
-  const agentSessionMap = useMissionStore((s) => s.agentSessionMap)
-  const startMission = useMissionStore((s) => s.startMission)
-  const completeMission = useMissionStore((s) => s.completeMission)
-  const resetMission = useMissionStore((s) => s.resetMission)
-  const {
-    dispatchMission,
-    agentSessionStatus,
-    isDispatching,
-    retryAgent,
-    handleKillAgent,
-    handleMissionPause,
-    handleSteerAgent,
-    abortMission,
-    resetOrchestratorState,
-  } = useMissionOrchestrator()
+  // ── Workspace connection ──────────────────────────────────────────────────
+  const { connected } = useWorkspaceSse()
 
+  // ── Local state ───────────────────────────────────────────────────────────
   const [goalDraft, setGoalDraft] = useState('')
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
-  const [storedReports, setStoredReports] = useState<StoredMissionReport[]>([])
+  const [decomposedTasks, setDecomposedTasks] = useState<DecomposedTask[] | null>(null)
+  const [activeMissionId, setActiveMissionId] = useState<string | null>(null)
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [terminalExpanded, setTerminalExpanded] = useState(false)
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
-  const [isStopping, setIsStopping] = useState(false)
-  const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [now, setNow] = useState(() => Date.now())
 
-  const phase = getPhase(activeMission)
+  // ── Workspace hook ────────────────────────────────────────────────────────
+  const workspace = useConductorWorkspace({
+    missionId: activeMissionId,
+    projectId: activeProjectId,
+    enabled: true,
+  })
 
-  useEffect(() => {
-    const syncLocalState = () => {
-      setApprovals(loadApprovals())
-      setStoredReports(loadStoredMissionReports())
+  const missionStatus = workspace.missionStatus.data
+  const taskRuns = workspace.taskRuns.data ?? []
+  const checkpoints = workspace.checkpoints.data ?? []
+
+  // ── Phase ─────────────────────────────────────────────────────────────────
+  const phase: ConductorPhase = useMemo(() => {
+    if (!activeMissionId) {
+      return decomposedTasks ? 'preview' : 'home'
     }
+    const status = missionStatus?.mission.status
+    if (status === 'completed' || status === 'done' || status === 'failed') return 'complete'
+    return 'active'
+  }, [activeMissionId, decomposedTasks, missionStatus])
 
-    syncLocalState()
-    window.addEventListener('storage', syncLocalState)
-    const intervalId = window.setInterval(syncLocalState, 3000)
-    return () => {
-      window.removeEventListener('storage', syncLocalState)
-      window.clearInterval(intervalId)
-    }
-  }, [])
-
+  // ── Timer for elapsed display ─────────────────────────────────────────────
   useEffect(() => {
-    if (!activeMission || activeMission.state !== 'running') return
-    if (activeMission.tasks.length === 0) return
-    const allDone = activeMission.tasks.every((task) => task.status === 'done')
-    if (allDone) {
-      completeMission()
-      setStoredReports(loadStoredMissionReports())
-    }
-  }, [activeMission, completeMission])
-
-  useEffect(() => {
-    if (!activeMission || phase !== 'active') return
+    if (phase !== 'active') return
     setNow(Date.now())
-    const intervalId = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(intervalId)
-  }, [activeMission, phase])
-
-  useEffect(() => {
-    if (phase !== 'home') return
-    setIsStopping(false)
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
   }, [phase])
 
-  useEffect(() => {
-    if (!activeMission || activeMission.team.length === 0) {
-      setSelectedAgentId(undefined)
-      return
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleDecompose = useCallback(async () => {
+    const trimmed = goalDraft.trim()
+    if (!trimmed) return
+    try {
+      const result = await workspace.decompose.mutateAsync(trimmed)
+      setDecomposedTasks(result.tasks.map((t) => ({ ...t, enabled: true })))
+    } catch {
+      // Fallback: single task if decompose fails (daemon offline)
+      setDecomposedTasks([{ title: trimmed, description: '', enabled: true }])
     }
-    if (!selectedAgentId) return
-    const exists = activeMission.team.some((member) => member.id === selectedAgentId)
-    if (!exists) setSelectedAgentId(undefined)
-  }, [activeMission, selectedAgentId])
+  }, [goalDraft, workspace.decompose])
 
-  const recentMissions = useMemo(
-    () => buildRecentMissionEntries(activeMission, missionHistory.reports, storedReports),
-    [activeMission, missionHistory.reports, storedReports],
-  )
-
-  const pendingApprovals = useMemo(
-    () => approvals.filter((entry) => entry.status === 'pending'),
-    [approvals],
-  )
-
-  const missionReports = useMemo(() => {
-    const fromHistory = missionHistory.reports
-      .map((checkpoint) => buildStoredMissionReportFromCheckpoint(checkpoint))
-      .filter((entry): entry is StoredMissionReport => Boolean(entry))
-    const merged = new Map<string, StoredMissionReport>()
-
-    ;[...storedReports, ...fromHistory].forEach((entry) => {
-      const key = entry.missionId ?? entry.id
-      if (!merged.has(key)) merged.set(key, entry)
-    })
-
-    return Array.from(merged.values()).sort((left, right) => right.completedAt - left.completedAt)
-  }, [missionHistory.reports, storedReports])
-
-  const activeReport = useMemo(() => {
-    if (!activeMission) return null
-    return missionReports.find((entry) => (entry.missionId ?? entry.id) === activeMission.id) ?? null
-  }, [activeMission, missionReports])
-
-  const agentCards = useMemo(
-    () =>
-      activeMission?.team.map((member) => ({
-        id: member.id,
-        name: member.name,
-        modelId: member.modelId,
-        status: agentSessionStatus[member.id]?.status ?? 'idle',
-        sessionKey: agentSessionMap[member.id] ?? null,
-      })) ?? [],
-    [activeMission, agentSessionMap, agentSessionStatus],
-  )
-
-  const selectedAgent = useMemo(
-    () => activeMission?.team.find((member) => member.id === selectedAgentId),
-    [activeMission, selectedAgentId],
-  )
-
-  const selectedAgentTasks = useMemo(
-    () => activeMission?.tasks.filter((task) => task.agentId === selectedAgentId) ?? [],
-    [activeMission, selectedAgentId],
-  )
-
-  const completedExportReport = useMemo(() => {
-    if (!activeMission || phase !== 'complete') return null
-    return {
-      id: activeReport?.id ?? activeMission.id,
-      missionId: activeReport?.missionId ?? activeMission.id,
-      name: activeReport?.name ?? activeMission.name,
-      goal: activeReport?.goal ?? activeMission.goal,
-      teamName: activeReport?.teamName ?? `${activeMission.team.length}-agent team`,
-      agents: activeReport?.agents ?? activeMission.team.map((member) => ({
-        id: member.id,
-        name: member.name,
-        modelId: member.modelId,
-      })),
-      taskStats: activeReport?.taskStats ?? {
-        total: activeMission.tasks.length,
-        completed: activeMission.tasks.filter((task) => task.status === 'done').length,
-        failed: 0,
-      },
-      duration: activeReport?.duration ?? Math.max(0, Date.now() - activeMission.startedAt),
-      tokenCount: activeReport?.tokenCount ?? 0,
-      costEstimate: activeReport?.costEstimate ?? 0,
-      artifacts: activeReport?.artifacts ?? activeMission.artifacts,
-      report: activeReport?.report ?? buildSummary(activeMission).join('\n'),
-      completedAt: activeReport?.completedAt ?? Date.now(),
+  const handleLaunch = useCallback(async () => {
+    if (!decomposedTasks) return
+    const enabled = decomposedTasks.filter((t) => t.enabled)
+    if (enabled.length === 0) return
+    try {
+      const result = await workspace.launchMission({
+        goal: goalDraft.trim(),
+        tasks: enabled,
+      })
+      setActiveMissionId(result.missionId)
+      setActiveProjectId(result.projectId)
+      setDecomposedTasks(null)
+    } catch (err) {
+      console.error('Launch failed:', err)
     }
-  }, [activeMission, activeReport, phase])
+  }, [decomposedTasks, goalDraft, workspace])
 
-  const elapsedTime = useMemo(
-    () => (activeMission ? formatElapsedTime(activeMission.startedAt, now) : '0s'),
-    [activeMission, now],
-  )
+  const handlePause = useCallback(() => {
+    if (activeMissionId) void workspace.pauseMission.mutateAsync(activeMissionId)
+  }, [activeMissionId, workspace.pauseMission])
 
-  const rightSidebarMissionReports = useMemo(
-    () => (activeReport ? [activeReport] : missionReports.slice(0, 6)),
-    [activeReport, missionReports],
-  )
+  const handleResume = useCallback(() => {
+    if (activeMissionId) void workspace.resumeMission.mutateAsync(activeMissionId)
+  }, [activeMissionId, workspace.resumeMission])
 
-  const compactTasks = useMemo(
-    () =>
-      activeMission?.tasks
-        .slice()
-        .sort((left, right) => {
-          const leftDone = left.status === 'done' ? 1 : 0
-          const rightDone = right.status === 'done' ? 1 : 0
-          if (leftDone !== rightDone) return leftDone - rightDone
-          return right.updatedAt - left.updatedAt
-        })
-        .slice(0, 6) ?? [],
-    [activeMission],
-  )
-
-  const runStatus = useMemo(() => {
-    if (pendingApprovals.length > 0 || agentCards.some((agent) => agent.status === 'waiting_for_input')) {
-      return 'needs_input' as const
+  const handleStop = useCallback(async () => {
+    if (activeMissionId) {
+      await workspace.stopMission.mutateAsync(activeMissionId)
     }
-    if (agentCards.some((agent) => agent.status === 'error')) {
-      return 'failed' as const
-    }
-    return 'running' as const
-  }, [agentCards, pendingApprovals.length])
-
-  const handleStartMission = () => {
-    const trimmedGoal = goalDraft.trim()
-    if (!trimmedGoal) return
-
-    const action = QUICK_ACTIONS.find((entry) => entry.id === selectedAction) ?? QUICK_ACTIONS[1]
-    const team = createTeamFromTemplate(action.templateId)
-    const tasks = createInitialTasks(trimmedGoal, team)
-    const startedAt = Date.now()
-    const missionId = createId('mission')
-    startMission({
-      id: missionId,
-      goal: trimmedGoal,
-      name: trimmedGoal.length > 64 ? `${trimmedGoal.slice(0, 61)}...` : trimmedGoal,
-      team,
-      tasks,
-      processType: 'parallel',
-      budgetLimit: '',
-      startedAt,
-    })
-    const mission = useMissionStore.getState().activeMission
-    if (mission && mission.id === missionId) {
-      void dispatchMission(mission)
-    }
-  }
-
-  const handleApprovalAction = (approvalId: string, nextStatus: 'approved' | 'denied') => {
-    const nextApprovals = approvals.map((entry) =>
-      entry.id === approvalId
-        ? { ...entry, status: nextStatus, resolvedAt: Date.now() }
-        : entry,
-    )
-    saveApprovals(nextApprovals)
-    setApprovals(nextApprovals)
-  }
+  }, [activeMissionId, workspace.stopMission])
 
   const handleNewMission = useCallback(() => {
-    resetOrchestratorState()
-    resetMission()
+    setActiveMissionId(null)
+    setActiveProjectId(null)
+    setDecomposedTasks(null)
     setGoalDraft('')
     setSelectedAction('build')
-    setIsStopping(false)
-  }, [resetMission, resetOrchestratorState])
+    setSelectedTaskId(null)
+  }, [])
 
   const handleBackToHome = useCallback(async () => {
-    if (!activeMission) {
-      handleNewMission()
-      return
+    if (activeMissionId) {
+      try { await workspace.stopMission.mutateAsync(activeMissionId) } catch { /* ignore */ }
     }
-    setIsStopping(true)
-    try {
-      await abortMission()
-    } catch {
-      /* stale session cleanup should not block reset */
-    } finally {
-      handleNewMission()
-    }
-  }, [abortMission, activeMission, handleNewMission])
-
-  const handleStopMission = useCallback(async () => {
-    if (isStopping) return
-    setIsStopping(true)
-    try {
-      await abortMission()
-      handleNewMission()
-    } finally {
-      setIsStopping(false)
-    }
-  }, [abortMission, handleNewMission, isStopping])
-
-  const handleDismissStaleMission = useCallback(() => {
     handleNewMission()
-  }, [handleNewMission])
+  }, [activeMissionId, handleNewMission, workspace.stopMission])
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const tasks: WorkspaceMissionTask[] = missionStatus?.task_breakdown ?? []
+  const missionName = missionStatus?.mission.name ?? goalDraft.trim()
+  const missionStatusLabel = missionStatus?.mission.status ?? 'pending'
+  const completedCount = missionStatus?.completed_count ?? 0
+  const totalCount = missionStatus?.total_count ?? 0
+  const progress = missionStatus?.mission.progress ?? 0
+  const runningAgents = missionStatus?.running_agents ?? []
+
+  // Find earliest task start for elapsed time
+  const earliestStart = useMemo(() => {
+    const starts = tasks.map((t) => t.started_at).filter(Boolean) as string[]
+    if (starts.length === 0) return null
+    return starts.sort()[0]
+  }, [tasks])
+
+  const pendingCheckpoints = useMemo(
+    () => checkpoints.filter((c) => c.status === 'pending' || c.status === 'awaiting_review'),
+    [checkpoints],
+  )
+
+  // ── Live output from workspace SSE (task_run.output events) ───────────────
+  const queryClient = useQueryClient()
+  const runningRuns = useMemo(
+    () => taskRuns.filter((r) => r.status === 'running' || r.status === 'active'),
+    [taskRuns],
+  )
+  const liveOutputQueries = useQueries({
+    queries: runningRuns.map((run) => ({
+      queryKey: ['workspace', 'task-run-live-output', run.id],
+      queryFn: async () =>
+        queryClient.getQueryData<string[]>(['workspace', 'task-run-live-output', run.id]) ?? [],
+      initialData:
+        queryClient.getQueryData<string[]>(['workspace', 'task-run-live-output', run.id]) ?? [],
+      staleTime: Number.POSITIVE_INFINITY,
+    })),
+  })
+  const liveOutputByRunId = useMemo(() => {
+    const map = new Map<string, string[]>()
+    runningRuns.forEach((run, i) => {
+      map.set(run.id, (liveOutputQueries[i]?.data ?? []).slice(-8))
+    })
+    return map
+  }, [liveOutputQueries, runningRuns])
+
+  // Map task_id → run for quick lookup
+  const runByTaskId = useMemo(
+    () => new Map(taskRuns.map((r) => [r.task_id, r] as const)),
+    [taskRuns],
+  )
+
+  // ── Checkpoint diff expansion ─────────────────────────────────────────────
+  const [expandedCheckpointId, setExpandedCheckpointId] = useState<string | null>(null)
+  const checkpointDiffQuery = useQuery({
+    queryKey: ['workspace', 'checkpoint-diff', expandedCheckpointId],
+    enabled: Boolean(expandedCheckpointId),
+    queryFn: async () => {
+      if (!expandedCheckpointId) return { diff: '' }
+      return getWorkspaceCheckpointDiff(expandedCheckpointId)
+    },
+  })
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── HOME PHASE ─────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
 
   if (phase === 'home') {
     return (
       <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="mx-auto flex min-h-full max-w-[720px] flex-col items-center justify-center px-6 py-12">
           <div className="w-full space-y-8">
+            {/* Title */}
             <div className="space-y-3 text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
                 Conductor
+                <span className={cn('size-2 rounded-full', connected ? 'bg-emerald-400' : 'bg-amber-400')} />
               </div>
               <h1 className="text-3xl font-semibold tracking-tight text-[var(--theme-text)] md:text-4xl">
                 What should the team do next?
               </h1>
               <p className="text-sm text-[var(--theme-muted-2)]">
-                Start a mission, keep the workspace focused, and expand only when execution is live.
+                Describe your goal. The workspace daemon will decompose it into tasks and assign agents.
               </p>
             </div>
 
+            {/* Input Card */}
             <section className="overflow-hidden rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
               <textarea
                 value={goalDraft}
-                onChange={(event) => setGoalDraft(event.target.value)}
+                onChange={(e) => setGoalDraft(e.target.value)}
                 placeholder="Describe the mission, constraints, and desired outcome."
                 className="min-h-[180px] w-full resize-none bg-[var(--theme-card)] px-6 py-5 text-base text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted-2)]"
               />
@@ -563,10 +312,7 @@ export function Conductor() {
                     <button
                       key={action.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedAction(action.id)
-                        setGoalDraft(action.prompt)
-                      }}
+                      onClick={() => { setSelectedAction(action.id); setGoalDraft(action.prompt) }}
                       className={cn(
                         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                         selectedAction === action.id
@@ -580,113 +326,159 @@ export function Conductor() {
                   ))}
                 </div>
                 <Button
-                  onClick={handleStartMission}
-                  disabled={!goalDraft.trim() || isDispatching}
+                  onClick={() => void handleDecompose()}
+                  disabled={!goalDraft.trim() || workspace.decompose.isPending}
                   className="min-w-[140px] rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
                 >
-                  {isDispatching ? 'Launching…' : 'Launch Mission'}
+                  {workspace.decompose.isPending ? 'Analyzing…' : 'Plan Mission'}
                   <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
                 </Button>
               </div>
             </section>
 
-            <section className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
-                Recent Missions
+            {/* Connection status */}
+            {!connected && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                Workspace daemon offline — start it with <code className="rounded bg-amber-500/20 px-1 font-mono text-xs">npm run daemon</code>
               </div>
-              <div className="space-y-2">
-                {recentMissions.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-5 text-sm text-[var(--theme-muted)]">
-                    No recent missions yet.
-                  </div>
-                ) : (
-                  recentMissions.map((mission) => (
-                    <button
-                      type="button"
-                      key={mission.id}
-                      onClick={() => {
-                        // If there's a stored report for this mission, show it as a completed mission
-                        const report = storedReports.find((r) => (r.missionId ?? r.id) === mission.id)
-                        if (report && report.goal) {
-                          resetOrchestratorState()
-                          startMission({
-                            id: report.missionId ?? report.id,
-                            goal: report.goal,
-                            name: report.name ?? report.goal.slice(0, 64),
-                            team: (report.agents ?? []).map((a) => ({ id: a.id, name: a.name, modelId: a.modelId, role: 'coder' as const, roleDescription: '', goal: '', backstory: '', status: 'idle' as const })),
-                            tasks: [],
-                            processType: 'parallel',
-                            budgetLimit: '',
-                            startedAt: report.completedAt - (report.duration ?? 0),
-                          })
-                          completeMission()
-                        }
-                      }}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-transparent px-4 py-3 text-left transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)]"
-                    >
-                      <span
-                        className={cn(
-                          'size-2.5 rounded-full',
-                          mission.status === 'done'
-                            ? 'bg-emerald-400'
-                            : mission.status === 'active'
-                              ? 'bg-[var(--theme-accent)] shadow-[0_0_12px_var(--theme-accent-glow)]'
-                              : 'bg-[var(--theme-border2)]',
-                        )}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-[var(--theme-text)]">{mission.title}</div>
-                        <div className="truncate text-xs text-[var(--theme-muted)]">{mission.subtitle}</div>
-                      </div>
-                      <div className="text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(mission.timestamp)}</div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </section>
+            )}
           </div>
         </main>
       </div>
     )
   }
 
-  if (!activeMission) return null
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── PREVIEW PHASE (task decomposition review) ──────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+
+  if (phase === 'preview' && decomposedTasks) {
+    const enabledCount = decomposedTasks.filter((t) => t.enabled).length
+    return (
+      <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto flex min-h-full max-w-[720px] flex-col items-center justify-center px-6 py-12">
+          <div className="w-full space-y-6">
+            <div className="space-y-2 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Plan</p>
+              <h1 className="text-2xl font-semibold tracking-tight">{goalDraft.length > 80 ? `${goalDraft.slice(0, 77)}…` : goalDraft}</h1>
+              <p className="text-sm text-[var(--theme-muted-2)]">{decomposedTasks.length} tasks decomposed — toggle any off before launch.</p>
+            </div>
+
+            <div className="space-y-2">
+              {decomposedTasks.map((task, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setDecomposedTasks((prev) =>
+                      prev ? prev.map((t, j) => j === i ? { ...t, enabled: !t.enabled } : t) : prev
+                    )
+                  }}
+                  className={cn(
+                    'flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors',
+                    task.enabled
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)]'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-card)] opacity-50',
+                  )}
+                >
+                  <span className={cn('mt-1 flex size-5 shrink-0 items-center justify-center rounded-md border text-xs', task.enabled ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)] text-white' : 'border-[var(--theme-border2)]')}>
+                    {task.enabled ? '✓' : ''}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[var(--theme-text)]">{task.title}</p>
+                    {task.description && <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{task.description}</p>}
+                    {task.agent && <span className="mt-1 inline-block rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] text-[var(--theme-muted-2)]">{task.agent}</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setDecomposedTasks(null)}
+                className="rounded-xl border border-[var(--theme-border)] px-4 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)]"
+              >
+                ← Back
+              </button>
+              <Button
+                onClick={() => void handleLaunch()}
+                disabled={enabledCount === 0 || workspace.createMission.isPending || workspace.startMission.isPending}
+                className="min-w-[160px] rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
+              >
+                {workspace.createMission.isPending || workspace.startMission.isPending ? 'Launching…' : `Launch ${enabledCount} Task${enabledCount !== 1 ? 's' : ''}`}
+                <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.7} />
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── COMPLETE PHASE ─────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
 
   if (phase === 'complete') {
-    const summaryLines = buildSummary(activeMission)
-    const costEstimate = activeReport?.costEstimate ?? 0
-    const tokenCount = activeReport?.tokenCount ?? 0
-
+    const failed = missionStatusLabel === 'failed'
     return (
       <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="grid h-full min-h-0 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
           <section className="flex min-h-0 flex-col overflow-y-auto px-6 py-8 lg:px-10">
             <div className="mx-auto w-full max-w-3xl space-y-6">
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">Mission Complete</p>
-                <h1 className="text-3xl font-semibold tracking-tight">{activeMission.name || activeMission.goal}</h1>
-                <p className="text-sm text-[var(--theme-muted)]">{activeMission.goal}</p>
+                <p className={cn('text-xs font-semibold uppercase tracking-[0.24em]', failed ? 'text-red-400' : 'text-emerald-400')}>
+                  {failed ? 'Mission Failed' : 'Mission Complete'}
+                </p>
+                <h1 className="text-3xl font-semibold tracking-tight">{missionName}</h1>
               </div>
 
+              {/* Task results */}
               <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Summary</h2>
-                <div className="mt-4 space-y-3">
-                  {summaryLines.map((line) => (
-                    <p key={line} className="text-sm leading-6 text-[var(--theme-text)]">
-                      {line}
-                    </p>
-                  ))}
+                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Tasks</h2>
+                <div className="mt-4 space-y-2">
+                  {tasks.map((task) => {
+                    const td = getTaskStatusDot(task.status)
+                    return (
+                      <div key={task.id} className="flex items-center gap-3">
+                        <span className={cn('size-2.5 rounded-full', td.dotClass)} />
+                        <span className="flex-1 text-sm text-[var(--theme-text)]">{task.name}</span>
+                        <span className="text-xs text-[var(--theme-muted-2)]">{td.label}</span>
+                      </div>
+                    )
+                  })}
+                  {tasks.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No task data available.</p>}
                 </div>
               </div>
 
-              {activeReport?.report ? (
+              {/* Checkpoints */}
+              {checkpoints.length > 0 && (
                 <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Report</h2>
-                  <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-6 text-[var(--theme-text)]">
-                    {activeReport.report}
-                  </pre>
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Checkpoints</h2>
+                  <div className="mt-4 space-y-2">
+                    {checkpoints.map((cp) => (
+                      <div key={cp.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--theme-card2)] px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-sm text-[var(--theme-text)]">{cp.diff_summary ?? `Checkpoint ${cp.id.slice(0, 8)}`}</p>
+                          <p className="text-xs text-[var(--theme-muted-2)]">
+                            {cp.files_changed != null && `${cp.files_changed} files`}
+                            {cp.additions != null && ` +${cp.additions}`}
+                            {cp.deletions != null && ` -${cp.deletions}`}
+                          </p>
+                        </div>
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          cp.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400' :
+                          cp.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
+                          'bg-amber-500/15 text-amber-400',
+                        )}>
+                          {cp.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : null}
+              )}
 
               <Button
                 onClick={handleNewMission}
@@ -695,23 +487,23 @@ export function Conductor() {
                 <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.7} />
                 New Mission
               </Button>
-              {completedExportReport ? <ExportMissionButton report={completedExportReport} /> : null}
             </div>
           </section>
 
+          {/* Right sidebar — stats */}
           <aside className="border-t border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-6 lg:border-l lg:border-t-0">
             <div className="space-y-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Final Cost</p>
-                <p className="mt-2 text-3xl font-semibold text-[var(--theme-text)]">${costEstimate.toFixed(2)}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Progress</p>
+                <p className="mt-2 text-3xl font-semibold text-[var(--theme-text)]">{completedCount}/{totalCount}</p>
               </div>
               <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
-                <p className="text-xs text-[var(--theme-muted)]">Tokens</p>
-                <p className="mt-1 text-xl font-semibold text-[var(--theme-text)]">{tokenCount.toLocaleString()}</p>
+                <p className="text-xs text-[var(--theme-muted)]">Status</p>
+                <p className="mt-1 text-xl font-semibold capitalize text-[var(--theme-text)]">{missionStatusLabel}</p>
               </div>
               <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
-                <p className="text-xs text-[var(--theme-muted)]">Artifacts</p>
-                <p className="mt-1 text-xl font-semibold text-[var(--theme-text)]">{activeMission.artifacts.length}</p>
+                <p className="text-xs text-[var(--theme-muted)]">Checkpoints</p>
+                <p className="mt-1 text-xl font-semibold text-[var(--theme-text)]">{checkpoints.length}</p>
               </div>
             </div>
           </aside>
@@ -720,66 +512,74 @@ export function Conductor() {
     )
   }
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── ACTIVE PHASE ───────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+
+  const isPaused = missionStatusLabel === 'paused'
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId)
+
+
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
       <div className={cn('grid min-h-0 flex-1', rightSidebarCollapsed ? 'grid-cols-[220px_minmax(0,1fr)_28px]' : 'grid-cols-[220px_minmax(0,1fr)_340px]')}>
+
+        {/* ── Left sidebar: tasks ──────────────────────────────────────── */}
         <aside className="flex min-h-0 flex-col border-r border-[var(--theme-border)] bg-[var(--theme-bg)]">
           <div className="border-b border-[var(--theme-border)] px-4 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">Missions</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">Tasks</p>
           </div>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
-            {recentMissions.map((mission) => (
-              <button
-                key={mission.id}
-                type="button"
-                className={cn(
-                  'flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors',
-                  mission.id === activeMission.id
-                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)]'
-                    : 'border-transparent hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)]',
-                )}
-              >
-                <span className="text-sm font-medium text-[var(--theme-text)]">{mission.title}</span>
-                <span className="text-[11px] text-[var(--theme-muted)]">{formatRelativeTime(mission.timestamp)}</span>
-              </button>
-            ))}
-          </div>
-          <div className="border-t border-[var(--theme-border)] px-3 py-3">
-            <div className="space-y-2">
-              {agentCards.map((agent) => (
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-3">
+            {tasks.map((task) => {
+              const td = getTaskStatusDot(task.status)
+              return (
                 <button
-                  key={agent.id}
+                  key={task.id}
                   type="button"
-                  onClick={() => setSelectedAgentId(agent.id)}
+                  onClick={() => setSelectedTaskId(task.id)}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
-                    selectedAgentId === agent.id
-                      ? 'bg-[var(--theme-accent-soft)]'
-                      : 'hover:bg-[var(--theme-card)]',
+                    'flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                    selectedTaskId === task.id
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)]'
+                      : 'border-transparent hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)]',
                   )}
                 >
-                  {(() => {
-                    const statusPresentation = getAgentStatusPresentation(agent.status)
-                    return (
-                      <>
-                        <span className="relative inline-flex size-2.5 shrink-0">
-                          {statusPresentation.pulseClass ? (
-                            <span className={cn('absolute inset-0 animate-ping rounded-full', statusPresentation.pulseClass)} />
-                          ) : null}
-                          <span className={cn('relative inline-flex size-2.5 rounded-full', statusPresentation.dotClass)} />
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-xs text-[var(--theme-text)]">{agent.name}</span>
-                        <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">{statusPresentation.label}</span>
-                      </>
-                    )
-                  })()}
+                  <span className={cn('size-2 shrink-0 rounded-full', td.dotClass)} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-[var(--theme-text)]">{task.name}</p>
+                    {task.agent_id && <p className="truncate text-[10px] text-[var(--theme-muted-2)]">{task.agent_id}</p>}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">{td.label}</span>
                 </button>
+              )
+            })}
+            {tasks.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-[var(--theme-muted)]">
+                Waiting for daemon…
+              </div>
+            )}
+          </div>
+
+          {/* Running agents */}
+          {runningAgents.length > 0 && (
+            <div className="border-t border-[var(--theme-border)] px-3 py-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted-2)]">Agents</p>
+              {runningAgents.map((agent) => (
+                <div key={agent} className="flex items-center gap-2 px-2 py-1">
+                  <span className="relative flex size-2.5">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                    <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
+                  </span>
+                  <span className="truncate text-xs text-[var(--theme-text)]">{agent}</span>
+                </div>
               ))}
             </div>
-          </div>
+          )}
         </aside>
 
+        {/* ── Center: mission stream ───────────────────────────────────── */}
         <section className="flex min-h-0 flex-col overflow-hidden">
+          {/* Header */}
           <header className="border-b border-[var(--theme-border)] bg-[var(--theme-card)]/70 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
@@ -792,43 +592,27 @@ export function Conductor() {
                 </button>
                 <span>Conductor</span>
                 <span className="text-[var(--theme-border2)]">&gt;</span>
-                <span className="max-w-[420px] truncate text-[var(--theme-text)]">{activeMission.name || activeMission.goal}</span>
+                <span className="max-w-[420px] truncate text-[var(--theme-text)]">{missionName}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-muted)]">
-                  Elapsed: {elapsedTime}
+                  Elapsed: {formatElapsedTime(earliestStart, now)}
                 </span>
-                {isDispatching ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">
-                    <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
-                    Dispatching
-                  </span>
-                ) : null}
-                {runStatus === 'needs_input' ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">
-                    <span className="size-2 rounded-full bg-amber-400" />
-                    Needs input
-                  </span>
-                ) : null}
-                {isStopping ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300">
-                    <span className="size-2 rounded-full bg-red-400 animate-pulse" />
-                    Stopping
-                  </span>
-                ) : null}
+                {/* Progress */}
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+                  {completedCount}/{totalCount} · {progress}%
+                </span>
                 <button
                   type="button"
-                  onClick={() => void handleMissionPause(missionState === 'running')}
-                  disabled={isStopping || agentCards.length === 0}
-                  className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={isPaused ? handleResume : handlePause}
+                  className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                 >
-                  {missionState === 'paused' ? 'Resume' : 'Pause'}
+                  {isPaused ? 'Resume' : 'Pause'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleStopMission()}
-                  disabled={isStopping}
-                  className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => void handleStop()}
+                  className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15"
                 >
                   <HugeiconsIcon icon={CancelCircleHalfDotIcon} size={14} strokeWidth={1.7} />
                   Stop
@@ -836,239 +620,292 @@ export function Conductor() {
               </div>
             </div>
           </header>
-          {selectedAgent ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-              <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent View</p>
-                  <p className="truncate text-sm font-medium text-[var(--theme-text)]">{selectedAgent.name}</p>
+
+          {/* Center content — task detail or overview */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
+            {selectedTask ? (() => {
+              const run = runByTaskId.get(selectedTask.id)
+              const liveLines = run ? liveOutputByRunId.get(run.id) ?? [] : []
+              return (
+                <div className="flex min-h-0 flex-1 flex-col space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Task Detail</p>
+                      <p className="text-sm font-medium text-[var(--theme-text)]">{selectedTask.name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTaskId(null)}
+                      className="rounded-full border border-[var(--theme-border)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)]"
+                    >
+                      Back to overview
+                    </button>
+                  </div>
+                  {/* Status bar */}
+                  <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className={cn('size-3 rounded-full', getTaskStatusDot(selectedTask.status).dotClass)} />
+                      <span className="text-sm capitalize text-[var(--theme-text)]">{selectedTask.status}</span>
+                      {selectedTask.agent_id && (
+                        <span className="rounded-full bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] text-[var(--theme-muted)]">{selectedTask.agent_id}</span>
+                      )}
+                      {run?.agent_name && run.agent_name !== selectedTask.agent_id && (
+                        <span className="rounded-full bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] text-[var(--theme-muted)]">{run.agent_name}</span>
+                      )}
+                      {selectedTask.started_at && (
+                        <span className="text-[10px] text-[var(--theme-muted-2)]">Started {new Date(selectedTask.started_at).toLocaleTimeString()}</span>
+                      )}
+                      {run && (
+                        <span className="text-[10px] text-[var(--theme-muted-2)]">Run: {run.status}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live output terminal */}
+                  {liveLines.length > 0 && (
+                    <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
+                      <div className="border-b border-[var(--theme-border)] px-4 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Live Output</p>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto px-4 py-3 font-mono text-xs leading-relaxed text-[var(--theme-muted-2)]">
+                        {liveLines.map((line, i) => (
+                          <div key={i} className="whitespace-pre-wrap">{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Agent output panel — full session history */}
+                  {run?.session_id && (
+                    <div className="min-h-0 flex-1 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] overflow-hidden">
+                      <AgentOutputPanel
+                        agentName={run.agent_name ?? run.session_label ?? selectedTask.agent_id ?? 'Agent'}
+                        sessionKey={run.session_id}
+                        tasks={[]}
+                        onClose={() => setSelectedTaskId(null)}
+                        compact
+                        outputLines={liveLines.length > 0 ? liveLines : undefined}
+                      />
+                    </div>
+                  )}
+
+                  {/* No session yet */}
+                  {!run?.session_id && (selectedTask.status === 'pending' || selectedTask.status === 'ready') && (
+                    <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)]">
+                      Waiting for agent to pick up this task…
+                    </div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAgentId(undefined)}
-                  className="rounded-full border border-[var(--theme-border)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                >
-                  Back to stream
-                </button>
+              )
+            })() : (
+              <div className="space-y-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Overview</p>
+
+                {/* Task summary cards with live output preview */}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {tasks.slice(0, 8).map((task) => {
+                    const td = getTaskStatusDot(task.status)
+                    const run = runByTaskId.get(task.id)
+                    const liveLines = run ? liveOutputByRunId.get(run.id) ?? [] : []
+                    const lastLine = liveLines[liveLines.length - 1]
+                    return (
+                      <button
+                        key={task.id}
+                        type="button"
+                        onClick={() => setSelectedTaskId(task.id)}
+                        className="flex flex-col gap-1.5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left transition-colors hover:border-[var(--theme-accent)]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={cn('size-2.5 shrink-0 rounded-full', td.dotClass)} />
+                          <span className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">{task.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-[var(--theme-muted-2)]">
+                          <span>{run?.agent_name ?? task.agent_id ?? 'Unassigned'}</span>
+                          <span>·</span>
+                          <span>{td.label}</span>
+                        </div>
+                        {lastLine && (
+                          <p className="truncate font-mono text-[10px] text-[var(--theme-muted-2)] opacity-70">{lastLine}</p>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Pending checkpoints inline — with expandable diffs */}
+                {pendingCheckpoints.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-400">Checkpoints Awaiting Review</p>
+                    {pendingCheckpoints.map((cp) => {
+                      const isExpanded = expandedCheckpointId === cp.id
+                      const diffText = isExpanded ? checkpointDiffQuery.data?.diff ?? '' : ''
+                      return (
+                        <div key={cp.id} className="rounded-2xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+                          <div className="flex items-center justify-between gap-3 px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCheckpointId(isExpanded ? null : cp.id)}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <p className="text-sm text-[var(--theme-text)]">{cp.diff_summary ?? `Checkpoint ${cp.id.slice(0, 8)}`}</p>
+                              <p className="text-[10px] text-[var(--theme-muted-2)]">
+                                {cp.files_changed != null && `${cp.files_changed} files`}
+                                {cp.additions != null && ` +${cp.additions}`}
+                                {cp.deletions != null && ` -${cp.deletions}`}
+                                {' · Click to '}{isExpanded ? 'collapse' : 'view diff'}
+                              </p>
+                            </button>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void workspace.approveCheckpoint.mutateAsync({ id: cp.id, action: 'merge' })}
+                                className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/25"
+                              >
+                                Approve & Merge
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void workspace.approveCheckpoint.mutateAsync({ id: cp.id, action: 'pr' })}
+                                className="rounded-full bg-sky-500/10 px-3 py-1 text-[11px] font-medium text-sky-300 transition-colors hover:bg-sky-500/20"
+                              >
+                                Open PR
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void workspace.rejectCheckpoint.mutateAsync(cp.id)}
+                                className="rounded-full bg-red-500/10 px-3 py-1 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                          {/* Expandable diff view */}
+                          {isExpanded && (
+                            <div className="border-t border-amber-500/20 bg-[var(--theme-bg)]">
+                              {checkpointDiffQuery.isPending ? (
+                                <div className="px-4 py-6 text-center text-xs text-[var(--theme-muted)]">Loading diff…</div>
+                              ) : diffText ? (
+                                <pre className="max-h-80 overflow-auto px-4 py-3 font-mono text-[11px] leading-relaxed">
+                                  {diffText.split('\n').map((line, i) => (
+                                    <div
+                                      key={i}
+                                      className={cn(
+                                        line.startsWith('+') && !line.startsWith('+++') ? 'text-emerald-400' :
+                                        line.startsWith('-') && !line.startsWith('---') ? 'text-red-400' :
+                                        line.startsWith('@@') ? 'text-sky-400' :
+                                        'text-[var(--theme-muted-2)]',
+                                      )}
+                                    >
+                                      {line}
+                                    </div>
+                                  ))}
+                                </pre>
+                              ) : (
+                                <div className="px-4 py-6 text-center text-xs text-[var(--theme-muted)]">No diff available</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-              <AgentOutputPanel
-                agentName={selectedAgent.name}
-                sessionKey={agentSessionMap[selectedAgent.id] ?? null}
-                tasks={selectedAgentTasks}
-                onClose={() => setSelectedAgentId(undefined)}
-                modelId={selectedAgent.modelId}
-                statusLabel={getAgentStatusPresentation(agentSessionStatus[selectedAgent.id]?.status).label}
-                enableMessaging={missionState === 'running'}
-                approvals={approvals.filter((entry) => entry.agentId === selectedAgent.id && entry.status === 'pending')}
-                onApprove={(approvalId) => handleApprovalAction(approvalId, 'approved')}
-                onDeny={(approvalId) => handleApprovalAction(approvalId, 'denied')}
-                onSendMessage={(_sessionKey, message) => {
-                  if (!selectedAgent) return
-                  void handleSteerAgent(selectedAgent.id, message)
-                }}
-              />
-            </div>
-          ) : (
-            <RunConsole
-              runId={activeMission.id}
-              runTitle={activeMission.name || activeMission.goal}
-              runStatus={runStatus}
-              agents={agentCards}
-              pendingApprovals={pendingApprovals.map((entry) => ({
-                id: entry.id,
-                tool: entry.action,
-                args: entry.context,
-                agentName: entry.agentName,
-              }))}
-              startedAt={activeMission.startedAt}
-              tokenCount={activeReport?.tokenCount}
-              costEstimate={activeReport?.costEstimate}
-              sessionKeys={Object.values(agentSessionMap)}
-              agentNameMap={Object.fromEntries(
-                Object.entries(agentSessionMap).map(([agentId, sessionKey]) => [
-                  sessionKey,
-                  activeMission.team.find((member) => member.id === agentId)?.name ?? agentId,
-                ]),
-              )}
-              artifacts={activeMission.artifacts.map((artifact) => ({
-                id: artifact.id,
-                type: artifact.type === 'code' ? 'file' : 'output',
-                name: artifact.title,
-                content: artifact.content,
-                timestamp: artifact.timestamp,
-              }))}
-              isStopping={isStopping}
-              onApprove={(approvalId) => handleApprovalAction(approvalId, 'approved')}
-              onDeny={(approvalId) => handleApprovalAction(approvalId, 'denied')}
-              tabs={['stream', 'timeline', 'artifacts']}
-              minimalChrome
-            />
-          )}
+            )}
+          </div>
         </section>
 
+        {/* ── Right sidebar ────────────────────────────────────────────── */}
         <aside className="relative flex min-h-0 flex-col overflow-hidden border-l border-[var(--theme-border)] bg-[var(--theme-bg)]">
           <button
             type="button"
-            onClick={() => setRightSidebarCollapsed((current) => !current)}
+            onClick={() => setRightSidebarCollapsed((c) => !c)}
             className="absolute left-0 top-20 z-10 flex h-10 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)] shadow-lg transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-            aria-label={rightSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              size={14}
-              strokeWidth={1.7}
-              className={cn('transition-transform', rightSidebarCollapsed ? 'rotate-180' : '')}
-            />
+            <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} className={cn('transition-transform', rightSidebarCollapsed ? 'rotate-180' : '')} />
           </button>
           {rightSidebarCollapsed ? (
             <div className="flex h-full items-start justify-center pt-36">
-              <span className="-rotate-90 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--theme-muted-2)]">
-                Insights
-              </span>
+              <span className="-rotate-90 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--theme-muted-2)]">Insights</span>
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
+              {/* Progress */}
               <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Tasks</h2>
-                  <span className="text-[11px] text-[var(--theme-muted-2)]">{activeMission.tasks.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {compactTasks.length === 0 ? (
-                    <div className="rounded-2xl bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
-                      No tasks queued for this mission.
-                    </div>
-                  ) : (
-                    compactTasks.map((task) => {
-                      const taskMeta = getTaskColumnMeta(task.status)
-                      return (
-                        <div key={task.id} className="flex items-center gap-2 rounded-2xl bg-[var(--theme-card)] px-3 py-2.5">
-                          <span className={cn('size-2 shrink-0 rounded-full', taskMeta.dotClass)} />
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm text-[var(--theme-text)]">{task.title}</div>
-                          </div>
-                          <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">
-                            {taskMeta.label}
-                          </span>
-                        </div>
-                      )
-                    })
-                  )}
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Progress</h2>
+                <div className="rounded-2xl bg-[var(--theme-card)] px-3 py-3">
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="text-[var(--theme-muted)]">Tasks</span>
+                    <span className="font-medium text-[var(--theme-text)]">{completedCount}/{totalCount}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[var(--theme-card2)]">
+                    <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
+                  </div>
                 </div>
               </section>
 
+              {/* Task list (compact) */}
               <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Active Team</h2>
-                  <span className="text-[11px] text-[var(--theme-muted-2)]">{agentCards.length}</span>
-                </div>
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Task Status</h2>
                 <div className="space-y-2">
-                  {agentCards.map((agent) => {
-                    const statusPresentation = getAgentStatusPresentation(agent.status)
-                    const assignedTask = activeMission.tasks.find((task) => task.agentId === agent.id && task.status !== 'done')
+                  {tasks.slice(0, 6).map((task) => {
+                    const td = getTaskStatusDot(task.status)
                     return (
-                      <div
-                        key={agent.id}
-                        className={cn(
-                          'rounded-2xl bg-[var(--theme-card)] px-3 py-3 transition-colors',
-                          selectedAgentId === agent.id && 'ring-1 ring-[var(--theme-accent)]',
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setSelectedAgentId(agent.id)}
-                          className="flex w-full items-center gap-2 text-left"
-                        >
-                          <span className="relative inline-flex size-2.5 shrink-0">
-                            {statusPresentation.pulseClass ? (
-                              <span className={cn('absolute inset-0 animate-ping rounded-full', statusPresentation.pulseClass)} />
-                            ) : null}
-                            <span className={cn('relative inline-flex size-2.5 rounded-full', statusPresentation.dotClass)} />
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--theme-text)]">{agent.name}</span>
-                          <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">{statusPresentation.label}</span>
-                        </button>
-                        <p className="mt-1 truncate text-xs text-[var(--theme-muted)]">
-                          {assignedTask?.title ?? 'No active task assigned'}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {agent.status === 'error' ? (
-                            <button
-                              type="button"
-                              onClick={() => void retryAgent(agent.id)}
-                              className="rounded-full border border-amber-400/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-500/15"
-                            >
-                              Retry
-                            </button>
-                          ) : null}
-                          {agent.sessionKey ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleKillAgent(agent.id)}
-                              className="rounded-full border border-red-400/35 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/15"
-                            >
-                              Stop agent
-                            </button>
-                          ) : null}
-                        </div>
+                      <div key={task.id} className="flex items-center gap-2 rounded-2xl bg-[var(--theme-card)] px-3 py-2.5">
+                        <span className={cn('size-2 shrink-0 rounded-full', td.dotClass)} />
+                        <span className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">{task.name}</span>
+                        <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">{td.label}</span>
                       </div>
                     )
                   })}
                 </div>
               </section>
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Approvals</h2>
-                  <ApprovalsBell
-                    approvals={approvals}
-                    onApprove={(approvalId) => handleApprovalAction(approvalId, 'approved')}
-                    onDeny={(approvalId) => handleApprovalAction(approvalId, 'denied')}
-                  />
-                </div>
-                <div className="space-y-2">
-                  {pendingApprovals.length === 0 ? (
-                    <div className="rounded-2xl bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
-                      No pending approvals.
-                    </div>
-                  ) : (
-                    pendingApprovals.slice(0, 3).map((entry) => (
-                      <div key={entry.id} className="rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3 py-3">
-                        <div className="text-xs font-semibold text-amber-300">{entry.agentName}</div>
-                        <div className="mt-1 text-xs text-[var(--theme-text)]">{entry.action}</div>
+              {/* Agents */}
+              {runningAgents.length > 0 && (
+                <section className="space-y-3">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Active Agents</h2>
+                  <div className="space-y-2">
+                    {runningAgents.map((agent) => (
+                      <div key={agent} className="flex items-center gap-2 rounded-2xl bg-[var(--theme-card)] px-3 py-2.5">
+                        <span className="relative flex size-2.5">
+                          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                          <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
+                        </span>
+                        <span className="text-sm text-[var(--theme-text)]">{agent}</span>
                       </div>
-                    ))
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Checkpoints count */}
+              <section className="space-y-3">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Checkpoints</h2>
+                <div className="rounded-2xl bg-[var(--theme-card)] px-3 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--theme-muted)]">Total</span>
+                    <span className="font-medium text-[var(--theme-text)]">{checkpoints.length}</span>
+                  </div>
+                  {pendingCheckpoints.length > 0 && (
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-amber-400">Pending review</span>
+                      <span className="font-medium text-amber-400">{pendingCheckpoints.length}</span>
+                    </div>
                   )}
                 </div>
               </section>
 
+              {/* Mission controls */}
               <section className="space-y-3">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Cost</h2>
-                <div className="space-y-2 rounded-2xl bg-[var(--theme-card)] px-3 py-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--theme-muted)]">This mission</span>
-                    <span className="font-medium text-[var(--theme-text)]">{formatCompactCost(activeReport?.costEstimate)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--theme-muted)]">Tokens</span>
-                    <span className="font-medium text-[var(--theme-text)]">{(activeReport?.tokenCount ?? 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--theme-muted)]">Recent missions</span>
-                    <span className="font-medium text-[var(--theme-text)]">{rightSidebarMissionReports.length}</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Controls</h2>
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Controls</h2>
                 <button
                   type="button"
-                  onClick={handleDismissStaleMission}
+                  onClick={handleNewMission}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-3 text-sm text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                 >
                   <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.7} />
-                  Dismiss Stale Mission
+                  New Mission
                 </button>
               </section>
             </div>
@@ -1076,17 +913,16 @@ export function Conductor() {
         </aside>
       </div>
 
+      {/* ── Terminal workspace ────────────────────────────────────────── */}
       <section className="border-t border-[var(--theme-border)] bg-[var(--theme-card)]">
         <button
           type="button"
-          onClick={() => setTerminalExpanded((current) => !current)}
+          onClick={() => setTerminalExpanded((c) => !c)}
           className="flex w-full items-center justify-between px-4 py-2 text-left"
         >
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Terminal Workspace</p>
-            <p className="text-xs text-[var(--theme-muted-2)]">
-              {terminalExpanded ? 'Collapse terminal' : 'Expand terminal'}
-            </p>
+            <p className="text-xs text-[var(--theme-muted-2)]">{terminalExpanded ? 'Collapse terminal' : 'Expand terminal'}</p>
           </div>
           <HugeiconsIcon icon={terminalExpanded ? ArrowRight01Icon : PlusSignIcon} size={16} strokeWidth={1.7} className={cn('transition-transform', terminalExpanded && 'rotate-90')} />
         </button>
