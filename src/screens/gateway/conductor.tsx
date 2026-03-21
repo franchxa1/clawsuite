@@ -601,9 +601,28 @@ export function Conductor() {
                   </div>
                 ) : (
                   recentMissions.map((mission) => (
-                    <div
+                    <button
+                      type="button"
                       key={mission.id}
-                      className="flex items-center gap-3 rounded-2xl border border-transparent px-4 py-3 transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)]"
+                      onClick={() => {
+                        // If there's a stored report for this mission, show it as a completed mission
+                        const report = storedReports.find((r) => (r.missionId ?? r.id) === mission.id)
+                        if (report && report.goal) {
+                          resetOrchestratorState()
+                          startMission({
+                            id: report.missionId ?? report.id,
+                            goal: report.goal,
+                            name: report.name ?? report.goal.slice(0, 64),
+                            team: (report.agents ?? []).map((a) => ({ id: a.id, name: a.name, modelId: a.modelId, role: 'coder' as const, roleDescription: '', goal: '', backstory: '', status: 'idle' as const })),
+                            tasks: [],
+                            processType: 'parallel',
+                            budgetLimit: '',
+                            startedAt: report.completedAt - (report.duration ?? 0),
+                          })
+                          completeMission()
+                        }
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl border border-transparent px-4 py-3 text-left transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)]"
                     >
                       <span
                         className={cn(
@@ -620,7 +639,7 @@ export function Conductor() {
                         <div className="truncate text-xs text-[var(--theme-muted)]">{mission.subtitle}</div>
                       </div>
                       <div className="text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(mission.timestamp)}</div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>

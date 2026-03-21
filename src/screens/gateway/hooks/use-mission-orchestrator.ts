@@ -386,8 +386,6 @@ export function useMissionOrchestrator() {
       body: JSON.stringify({
         friendlyId,
         label,
-        isolated: true,
-        exec: 'auto',
         ...(model ? { model } : {}),
       }),
     })
