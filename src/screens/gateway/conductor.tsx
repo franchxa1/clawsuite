@@ -348,7 +348,7 @@ export function Conductor() {
     return (
       <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         {/* Hero + missions flow together, group is centered */}
-        <main className="mx-auto flex min-h-0 flex-1 max-w-[720px] flex-col items-center justify-center px-6 py-8">
+        <main className="mx-auto flex min-h-0 flex-1 w-full max-w-[720px] flex-col items-stretch justify-center px-6 py-8">
           <div className="w-full space-y-8">
             <div className="space-y-3 text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
