@@ -10,18 +10,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { workspaceRequestJson } from '@/lib/workspace-checkpoints'
-import type { ProjectFormState } from './lib/workspace-types'
+import {
+  extractRecentPaths,
+  type ProjectFormState,
+} from './lib/workspace-types'
 import {
   ACCEPTED_SPEC_FILE_TYPES,
   readSpecFile,
 } from './lib/spec-file'
-
-function extractRecentPaths(payload: unknown): string[] {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
-  const paths = (payload as { paths?: unknown }).paths
-  if (!Array.isArray(paths)) return []
-  return paths.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-}
 
 type WorkspaceEntityDialogProps = {
   open: boolean

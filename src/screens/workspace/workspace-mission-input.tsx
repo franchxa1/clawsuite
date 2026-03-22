@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { workspaceRequestJson } from '@/lib/workspace-checkpoints'
 import { cn } from '@/lib/utils'
@@ -97,6 +98,18 @@ function toProjectPath(goal: string): string {
   return `/tmp/workspace-mission-${slug || 'launch'}-${Date.now().toString(36)}`
 }
 
+function formatAgentRole(agentType: string | null): string {
+  if (!agentType) return 'Unassigned'
+  return agentType.charAt(0).toUpperCase() + agentType.slice(1)
+}
+
+function appendQuickActionPrompt(goal: string, prompt: string): string {
+  const trimmedGoal = goal.trim()
+  if (!trimmedGoal) return prompt
+  if (trimmedGoal.includes(prompt)) return goal
+  return `${trimmedGoal}\n\n${prompt}`
+}
+
 export function WorkspaceMissionInput({
   connected,
 }: WorkspaceMissionInputProps) {
@@ -107,6 +120,14 @@ export function WorkspaceMissionInput({
     if (typeof window === 'undefined') return ''
     return window.localStorage.getItem(GOAL_STORAGE_KEY) ?? ''
   })
+  const [projectPathDraft, setProjectPathDraft] = useState<string>(() =>
+    toProjectPath(
+      typeof window === 'undefined'
+        ? ''
+        : (window.localStorage.getItem(GOAL_STORAGE_KEY) ?? ''),
+    ),
+  )
+  const [projectPathEdited, setProjectPathEdited] = useState(false)
   const [reviewTasks, setReviewTasks] = useState<MissionDraftTask[] | null>(null)
   const [launchError, setLaunchError] = useState<string | null>(null)
 
@@ -118,6 +139,11 @@ export function WorkspaceMissionInput({
     }
     window.localStorage.setItem(GOAL_STORAGE_KEY, goalDraft)
   }, [goalDraft])
+
+  useEffect(() => {
+    if (projectPathEdited) return
+    setProjectPathDraft(toProjectPath(goalDraft))
+  }, [goalDraft, projectPathEdited])
 
   const enabledTasks = useMemo(
     () => (reviewTasks ?? []).filter((task) => task.enabled),
@@ -154,6 +180,7 @@ export function WorkspaceMissionInput({
     mutationFn: async (params: {
       goal: string
       tasks: MissionDraftTask[]
+      projectPath: string
     }) => {
       const project = extractProject(
         await workspaceRequestJson('/api/workspace/projects', {
@@ -163,7 +190,7 @@ export function WorkspaceMissionInput({
           },
           body: JSON.stringify({
             name: toProjectName(params.goal),
-            path: toProjectPath(params.goal),
+            path: params.projectPath,
             spec: params.goal,
           }),
         }),
@@ -243,6 +270,8 @@ export function WorkspaceMissionInput({
       setLaunchError(null)
       setReviewTasks(null)
       setGoalDraft('')
+      setProjectPathDraft(toProjectPath(''))
+      setProjectPathEdited(false)
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(GOAL_STORAGE_KEY)
       }
@@ -283,8 +312,54 @@ export function WorkspaceMissionInput({
     decomposeMutation.mutate(goal)
   }
 
+  function updateReviewTasks(
+    updater: (current: MissionDraftTask[]) => MissionDraftTask[],
+  ) {
+    setReviewTasks((current) => (current ? updater(current) : current))
+  }
+
+  function handleTaskEnabledChange(taskId: string, enabled: boolean) {
+    updateReviewTasks((current) =>
+      current.map((task) => (task.id === taskId ? { ...task, enabled } : task)),
+    )
+  }
+
+  function handleTaskNameChange(taskId: string, nextName: string) {
+    updateReviewTasks((current) => {
+      const currentTask = current.find((task) => task.id === taskId)
+      if (!currentTask) return current
+
+      const previousName = currentTask.name
+      return current.map((task) => {
+        if (task.id === taskId) {
+          return { ...task, name: nextName }
+        }
+
+        if (!task.depends_on.includes(previousName)) {
+          return task
+        }
+
+        return {
+          ...task,
+          depends_on: task.depends_on.map((dependency) =>
+            dependency === previousName ? nextName : dependency,
+          ),
+        }
+      })
+    })
+  }
+
+  function handleTaskDescriptionChange(taskId: string, description: string) {
+    updateReviewTasks((current) =>
+      current.map((task) =>
+        task.id === taskId ? { ...task, description } : task,
+      ),
+    )
+  }
+
   function handleStartMission() {
     const goal = goalDraft.trim()
+    const projectPath = projectPathDraft.trim()
     const cleanedTasks = enabledTasks.map((task) => ({
       ...task,
       name: task.name.trim(),
@@ -294,6 +369,11 @@ export function WorkspaceMissionInput({
 
     if (!goal) {
       setLaunchError('Mission goal is required.')
+      return
+    }
+
+    if (!projectPath) {
+      setLaunchError('Project path is required.')
       return
     }
 
@@ -313,7 +393,7 @@ export function WorkspaceMissionInput({
     }
 
     setLaunchError(null)
-    startMissionMutation.mutate({ goal, tasks: cleanedTasks })
+    startMissionMutation.mutate({ goal, tasks: cleanedTasks, projectPath })
   }
 
   return (
@@ -334,51 +414,60 @@ export function WorkspaceMissionInput({
               What should the team do next?
             </h1>
             <p className="text-sm text-primary-600">
-              Describe the mission, review the decomposed tasks, and launch it into the existing workspace flow.
+              Plan the mission, review the editable task breakdown, then launch it into the existing workspace flow.
             </p>
           </div>
         </div>
       </header>
 
-      <div className="overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm">
-        <textarea
-          value={goalDraft}
-          onChange={(event) => setGoalDraft(event.target.value)}
-          placeholder="Describe the mission goal, constraints, and desired outcome."
-          className="min-h-[160px] w-full resize-none bg-white px-5 py-4 text-sm text-primary-900 outline-none placeholder:text-primary-500"
-        />
-        <div className="flex flex-col gap-3 border-t border-primary-200 bg-primary-50/60 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {QUICK_ACTIONS.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                onClick={() => {
-                  setSelectedAction(action.id)
-                  setGoalDraft(action.prompt)
-                }}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  selectedAction === action.id
-                    ? 'border-accent-500 bg-primary-100 text-primary-900'
-                    : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:text-primary-900',
-                )}
-              >
-                <HugeiconsIcon icon={action.icon} size={14} strokeWidth={1.7} />
-                {action.label}
-              </button>
-            ))}
+      {!reviewTasks ? (
+        <div className="overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm">
+          <div className="border-b border-primary-200 bg-primary-50/60 px-5 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
+              Plan → Review → Build
+            </p>
           </div>
-          <Button
-            onClick={handlePlanMission}
-            disabled={!connected || !goalDraft.trim() || decomposeMutation.isPending}
-            className="bg-accent-500 text-white hover:bg-accent-500/90"
-          >
-            {decomposeMutation.isPending ? 'Launching...' : 'Launch Mission'}
-            <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
-          </Button>
+          <textarea
+            value={goalDraft}
+            onChange={(event) => setGoalDraft(event.target.value)}
+            placeholder="Describe the mission goal, constraints, and desired outcome."
+            className="min-h-[160px] w-full resize-none bg-white px-5 py-4 text-sm text-primary-900 outline-none placeholder:text-primary-500"
+          />
+          <div className="flex flex-col gap-3 border-t border-primary-200 bg-primary-50/60 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAction(action.id)
+                    setGoalDraft((current) =>
+                      appendQuickActionPrompt(current, action.prompt),
+                    )
+                  }}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    selectedAction === action.id
+                      ? 'border-accent-500 bg-primary-100 text-primary-900'
+                      : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:text-primary-900',
+                  )}
+                >
+                  <HugeiconsIcon icon={action.icon} size={14} strokeWidth={1.7} />
+                  {action.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={handlePlanMission}
+              disabled={!connected || !goalDraft.trim() || decomposeMutation.isPending}
+              className="bg-accent-500 text-white hover:bg-accent-500/90"
+            >
+              {decomposeMutation.isPending ? 'Planning...' : 'Plan It'}
+              <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {reviewTasks ? (
         <div className="rounded-xl border border-primary-200 bg-white shadow-sm">
@@ -388,7 +477,7 @@ export function WorkspaceMissionInput({
                 Mission Review
               </h2>
               <p className="text-sm text-primary-600">
-                {reviewTasks.length} tasks decomposed. Disable anything you do not want to launch.
+                Review the plan, edit task details, and choose the workspace path before starting the mission.
               </p>
             </div>
             <div className="text-sm text-primary-600">
@@ -396,52 +485,73 @@ export function WorkspaceMissionInput({
             </div>
           </div>
 
-          <div className="space-y-3 px-5 py-4">
-            {reviewTasks.map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                onClick={() => {
-                  setReviewTasks((current) =>
-                    current
-                      ? current.map((entry) =>
-                          entry.id === task.id
-                            ? { ...entry, enabled: !entry.enabled }
-                            : entry,
-                        )
-                      : current,
-                  )
+          <div className="space-y-4 px-5 py-4">
+            <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-500">
+                Mission Goal
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-primary-900">
+                {goalDraft.trim()}
+              </p>
+            </div>
+
+            <label className="block space-y-1.5">
+              <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-primary-500">
+                Project Path
+              </span>
+              <Input
+                value={projectPathDraft}
+                onChange={(event) => {
+                  setProjectPathEdited(true)
+                  setProjectPathDraft(event.target.value)
                 }}
+                placeholder="/tmp/workspace-mission-..."
+                className="bg-white"
+              />
+            </label>
+
+            {reviewTasks.map((task) => (
+              <article
+                key={task.id}
                 className={cn(
-                  'w-full rounded-xl border px-4 py-3 text-left transition-colors',
+                  'rounded-xl border px-4 py-3 transition-colors',
                   task.enabled
                     ? 'border-accent-500 bg-primary-50'
-                    : 'border-primary-200 bg-white text-primary-600 opacity-70',
+                    : 'border-primary-200 bg-white opacity-70',
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <span
-                    className={cn(
-                      'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold',
-                      task.enabled
-                        ? 'border-accent-500 bg-accent-500 text-white'
-                        : 'border-primary-300 bg-primary-50 text-primary-500',
-                    )}
-                  >
-                    {task.enabled ? '✓' : ''}
-                  </span>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                      <p className="text-sm font-medium text-primary-900">
-                        {task.name}
-                      </p>
-                      {task.suggested_agent_type ? (
-                        <span className="rounded-full border border-primary-200 bg-white px-2 py-0.5 text-[11px] text-primary-600">
-                          {task.suggested_agent_type}
-                        </span>
-                      ) : null}
+                  <label className="mt-1 flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={task.enabled}
+                      onChange={(event) =>
+                        handleTaskEnabledChange(task.id, event.target.checked)
+                      }
+                      className="size-4 rounded border-primary-300 text-accent-500 focus:ring-accent-500"
+                    />
+                  </label>
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <Input
+                        value={task.name}
+                        onChange={(event) =>
+                          handleTaskNameChange(task.id, event.target.value)
+                        }
+                        className="bg-white text-sm font-medium text-primary-900"
+                      />
+                      <span className="inline-flex self-start rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[11px] font-medium text-primary-600">
+                        {formatAgentRole(task.suggested_agent_type)}
+                      </span>
                     </div>
-                    <p className="text-sm text-primary-600">{task.description}</p>
+                    <textarea
+                      value={task.description}
+                      onChange={(event) =>
+                        handleTaskDescriptionChange(task.id, event.target.value)
+                      }
+                      rows={3}
+                      className="w-full rounded-xl border border-primary-200 bg-white px-3 py-2.5 text-sm text-primary-600 outline-none transition-colors focus:border-accent-500"
+                    />
                     {task.depends_on.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {task.depends_on.map((dependency) => (
@@ -456,7 +566,7 @@ export function WorkspaceMissionInput({
                     ) : null}
                   </div>
                 </div>
-              </button>
+              </article>
             ))}
           </div>
 
@@ -468,7 +578,7 @@ export function WorkspaceMissionInput({
                 setReviewTasks(null)
               }}
             >
-              Back
+              Revise Plan
             </Button>
             <Button
               onClick={handleStartMission}
@@ -479,7 +589,7 @@ export function WorkspaceMissionInput({
               }
               className="bg-accent-500 text-white hover:bg-accent-500/90"
             >
-              {startMissionMutation.isPending ? 'Starting...' : 'Start'}
+              {startMissionMutation.isPending ? 'Starting...' : 'Start Mission'}
               <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.7} />
             </Button>
           </div>

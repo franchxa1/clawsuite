@@ -157,8 +157,14 @@ export function createServer(): {
   app.use("/api/workspace/stats", createStatsRouter(tracker));
   app.use("/api/workspace/phases", createPhasesRouter(tracker));
   app.use("/api/workspace/tasks", createTasksRouter(tracker, orchestrator));
-  app.use("/api/workspace/task-runs/adhoc", createAdhocTaskRunsRouter(tracker, orchestrator));
-  app.use("/api/workspace/task-runs", createTaskRunsRouter(tracker, orchestrator));
+  app.use(
+    "/api/workspace/task-runs/adhoc",
+    createAdhocTaskRunsRouter(tracker, orchestrator, openclawClient),
+  );
+  app.use(
+    "/api/workspace/task-runs",
+    createTaskRunsRouter(tracker, orchestrator, openclawClient),
+  );
   app.use("/api/workspace/agents", createAgentsRouter(tracker));
   app.use("/api/workspace/missions", createMissionsRouter(tracker));
   app.use("/api/workspace/checkpoints", createCheckpointsRouter(tracker, orchestrator));

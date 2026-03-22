@@ -244,7 +244,7 @@ export function WorkspaceRecentMissions() {
                     phaseName: mission.phaseName ?? undefined,
                     project: undefined,
                     projectId: mission.projectId,
-                    missionId: undefined,
+                    missionId: mission.id,
                     showWizard: undefined,
                   },
                 })

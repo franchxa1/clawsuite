@@ -330,6 +330,13 @@ export function extractDecomposeResponse(value: unknown): DecomposeResponse {
   }
 }
 
+export function extractRecentPaths(value: unknown): string[] {
+  const record = asRecord(value)
+  return asArray(record?.paths).flatMap((item) =>
+    typeof item === 'string' && item.trim().length > 0 ? [item] : [],
+  )
+}
+
 export function normalizeMission(value: unknown): WorkspaceMission {
   const record = asRecord(value)
   return {

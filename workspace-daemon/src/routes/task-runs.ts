@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { OpenClawClient } from "../openclaw-client";
 import { Orchestrator } from "../orchestrator";
 import { Tracker } from "../tracker";
 
@@ -24,6 +25,7 @@ async function waitForTaskRun(tracker: Tracker, taskId: string, timeoutMs = 5_00
 export function createAdhocTaskRunsRouter(
   tracker: Tracker,
   orchestrator: Orchestrator,
+  _openclawClient: OpenClawClient,
 ): Router {
   const router = Router();
 
@@ -131,7 +133,11 @@ export function createAdhocTaskRunsRouter(
   return router;
 }
 
-export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrator): Router {
+export function createTaskRunsRouter(
+  tracker: Tracker,
+  orchestrator: Orchestrator,
+  openclawClient: OpenClawClient,
+): Router {
   const router = Router();
 
   router.get("/", (req, res) => {
@@ -160,6 +166,41 @@ export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrato
       ok: true,
       deleted,
     });
+  });
+
+  router.post("/:id/message", async (req, res) => {
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!message) {
+      res.status(400).json({ error: "message is required" });
+      return;
+    }
+
+    const run = tracker.getTaskRun(req.params.id);
+    if (!run) {
+      res.status(404).json({ error: "Task run not found" });
+      return;
+    }
+
+    if (!run.session_id) {
+      res.status(400).json({ error: "Task run has no active session" });
+      return;
+    }
+
+    try {
+      await openclawClient.sendMessage(run.session_id, message);
+    } catch (error) {
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Internal error",
+      });
+      return;
+    }
+
+    tracker.appendRunEvent(run.id, "status", {
+      type: "user_message",
+      message,
+    });
+
+    res.json({ ok: true });
   });
 
   router.post("/:id/retry", async (req, res) => {
