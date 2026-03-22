@@ -98,6 +98,17 @@ function ensureProjectPolicyColumns(db: Database.Database): void {
   }
 }
 
+function ensureTaskAgentTypeColumn(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(tasks)').all() as Array<{
+    name: string
+  }>
+  const hasAgentType = columns.some((column) => column.name === 'agent_type')
+
+  if (!hasAgentType) {
+    db.exec('ALTER TABLE tasks ADD COLUMN agent_type TEXT')
+  }
+}
+
 function ensureAgentProfileColumns(db: Database.Database): void {
   const columns = db.prepare('PRAGMA table_info(agents)').all() as Array<{
     name: string
@@ -371,6 +382,7 @@ export function getDatabase(
   ensureCheckpointRawDiffColumn(db)
   ensureCheckpointQaResultColumn(db)
   ensureProjectPolicyColumns(db)
+  ensureTaskAgentTypeColumn(db)
   ensureAgentProfileColumns(db)
   ensureSessionIdColumn(db)
   ensureTeamsApprovalConfigColumn(db)

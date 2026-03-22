@@ -218,7 +218,7 @@ async function apiRequest(input: string, init?: RequestInit): Promise<unknown> {
 
 async function loadMissionTasks(missionId: string) {
   const payload = await apiRequest(
-    `/api/workspace-tasks?mission_id=${encodeURIComponent(missionId)}`,
+    `/api/workspace/tasks?mission_id=${encodeURIComponent(missionId)}`,
   )
   return extractTasks(payload)
 }
@@ -1244,7 +1244,7 @@ export function ProjectsScreen({
       if (!missionId) throw new Error('Mission response was empty')
 
       for (const [index, task] of cleanedTasks.entries()) {
-        await apiRequest('/api/workspace-tasks', {
+        await apiRequest('/api/workspace/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1467,7 +1467,7 @@ export function ProjectsScreen({
     }
     setSubmittingKey('task')
     try {
-      await apiRequest('/api/workspace-tasks', {
+      await apiRequest('/api/workspace/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -500,7 +500,7 @@ export function useConductorWorkspace(options?: {
       agent_id?: string | null
       sort_order: number
       depends_on?: string[]
-    }) => workspacePost('/api/workspace-tasks', params),
+    }) => workspacePost('/api/workspace/tasks', params),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'missions'] })
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'task-runs'] })

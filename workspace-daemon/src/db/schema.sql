@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   name TEXT NOT NULL,
   description TEXT,
   agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  agent_type TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   sort_order INTEGER NOT NULL DEFAULT 0,
   depends_on TEXT,

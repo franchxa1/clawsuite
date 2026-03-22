@@ -180,7 +180,7 @@ function formatRecentPlanDate(value: string): string {
 
 async function loadMissionTasks(missionId: string) {
   return extractTasks(
-    await apiRequest(`/api/workspace-tasks?mission_id=${encodeURIComponent(missionId)}`),
+    await apiRequest(`/api/workspace/tasks?mission_id=${encodeURIComponent(missionId)}`),
   )
 }
 
@@ -362,7 +362,7 @@ export function PlanReviewScreen({
               throw new Error(`Task "${task.name}" has an invalid dependency`)
             }
 
-            await apiRequest(`/api/workspace-tasks/${encodeURIComponent(task.id)}`, {
+            await apiRequest(`/api/workspace/tasks/${encodeURIComponent(task.id)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -401,7 +401,7 @@ export function PlanReviewScreen({
       const createdTasks = await Promise.all(
         cleanedTasks.map(async (task, index) =>
           normalizeTask(
-            await apiRequest('/api/workspace-tasks', {
+            await apiRequest('/api/workspace/tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -426,7 +426,7 @@ export function PlanReviewScreen({
             .map((dependency) => idByName.get(dependency))
             .filter((dependencyId): dependencyId is string => typeof dependencyId === 'string')
           if (dependencyIds.length === 0) return
-          await apiRequest(`/api/workspace-tasks/${encodeURIComponent(task.id)}`, {
+          await apiRequest(`/api/workspace/tasks/${encodeURIComponent(task.id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ depends_on: dependencyIds }),

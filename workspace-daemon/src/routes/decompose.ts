@@ -44,6 +44,7 @@ async function createTasksForMission(tracker: Tracker, missionId: string, tasks:
       mission_id: missionId,
       name: task.name,
       description: task.description,
+      agent_type: task.suggested_agent_type,
       sort_order: index,
       depends_on: [],
     }),

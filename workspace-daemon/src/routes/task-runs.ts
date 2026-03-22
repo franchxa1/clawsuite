@@ -101,7 +101,13 @@ export function createAdhocTaskRunsRouter(
     });
 
     tracker.startMission(mission.id);
-    await orchestrator.triggerTask(task.id);
+    try {
+      await orchestrator.triggerTask(task.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Internal error";
+      res.status(503).json({ error: message });
+      return;
+    }
 
     const taskRun = await waitForTaskRun(tracker, task.id);
     if (!taskRun) {
@@ -174,7 +180,20 @@ export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrato
       null,
       taskRun.attempt + 1,
     );
-    const dispatched = await orchestrator.dispatchTaskRun(retriedRun.id);
+    let dispatched = false;
+    try {
+      dispatched = await orchestrator.dispatchTaskRun(retriedRun.id);
+    } catch (error) {
+      tracker.updateTaskRun(retriedRun.id, {
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Internal error",
+      });
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Internal error",
+      });
+      return;
+    }
     if (!dispatched) {
       tracker.updateTaskRun(retriedRun.id, {
         status: "failed",

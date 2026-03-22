@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { AgentRunner } from "./agent-runner";
+import { AGENT_EXECUTION_DISABLED_MESSAGE } from "./agent-execution-disabled";
 import { Scheduler } from "./scheduler";
 import { Tracker } from "./tracker";
 import { getWorkflowConfig } from "./config";
@@ -202,54 +203,13 @@ export class Orchestrator extends EventEmitter {
   }
 
   async triggerTask(taskId: string): Promise<boolean> {
-    const task = this.tracker.getTask(taskId);
-    if (!task) {
-      return false;
-    }
-
-    const pendingRun = this
-      .tracker
-      .listTaskRuns({ taskId })
-      .find((entry) => entry.status === "pending");
-    if (pendingRun) {
-      return this.dispatchTaskRun(pendingRun.id);
-    }
-
-    this.tracker.setTaskStatus(taskId, "ready");
-    await this.tick();
-    return true;
+    void taskId;
+    throw new Error(AGENT_EXECUTION_DISABLED_MESSAGE);
   }
 
   async dispatchTaskRun(runId: string): Promise<boolean> {
-    const taskRun = this.tracker.getTaskRun(runId);
-    if (!taskRun || taskRun.status !== "pending") {
-      return false;
-    }
-
-    const task = this.tracker.listTasks({}).find((entry) => entry.id === taskRun.task_id) ?? null;
-    if (!task) {
-      return false;
-    }
-
-    const agent = taskRun.agent_id
-      ? this.tracker.getAgent(taskRun.agent_id)
-      : selectAgent(task, this.tracker.listAgents());
-    if (!agent) {
-      return false;
-    }
-
-    this.state.retryAttempts.delete(task.id);
-    this.state.claimed.add(task.id);
-    try {
-      await this.dispatchTask(task, {
-        taskRun,
-        agent,
-      });
-    } finally {
-      this.state.claimed.delete(task.id);
-    }
-
-    return true;
+    void runId;
+    throw new Error(AGENT_EXECUTION_DISABLED_MESSAGE);
   }
 
   controlTaskRun(runId: string, action: "pause" | "stop"): boolean {

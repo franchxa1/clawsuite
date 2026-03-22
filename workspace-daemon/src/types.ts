@@ -120,6 +120,7 @@ export interface Task {
   name: string
   description: string | null
   agent_id: string | null
+  agent_type?: string | null
   suggested_agent_type?: AgentAdapterType | null
   status: TaskStatus
   sort_order: number
@@ -467,6 +468,7 @@ export interface CreateTaskInput {
   name: string
   description?: string | null
   agent_id?: string | null
+  agent_type?: string | null
   status?: TaskStatus
   sort_order?: number
   depends_on?: string[] | null
@@ -476,6 +478,7 @@ export interface UpdateTaskInput {
   name?: string
   description?: string | null
   agent_id?: string | null
+  agent_type?: string | null
   status?: TaskStatus
   sort_order?: number
   depends_on?: string[] | null

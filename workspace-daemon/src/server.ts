@@ -7,6 +7,7 @@ import { Router } from "express";
 import { Tracker } from "./tracker";
 import { Orchestrator } from "./orchestrator";
 import { createProjectsRouter } from "./routes/projects";
+import { createStatsRouter } from "./routes/stats";
 import { createTasksRouter } from "./routes/tasks";
 import { createAgentsRouter } from "./routes/agents";
 import { createMissionsRouter } from "./routes/missions";
@@ -83,6 +84,7 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
   });
 
   app.use("/api/workspace/projects", createProjectsRouter(tracker));
+  app.use("/api/workspace/stats", createStatsRouter(tracker));
   app.use("/api/workspace/phases", createPhasesRouter(tracker));
   app.use("/api/workspace/tasks", createTasksRouter(tracker, orchestrator));
   app.use("/api/workspace/task-runs/adhoc", createAdhocTaskRunsRouter(tracker, orchestrator));

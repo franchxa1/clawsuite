@@ -128,6 +128,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
         invalidateQueries(queryClient, [
           ['workspace', 'task-runs'],
           ['workspace', 'mission-console'],
+          ['workspace', 'conductor'],
         ])
       })
 
@@ -147,6 +148,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
 
         invalidateQueries(queryClient, [
           ['workspace', 'task-runs', runId, 'events'],
+          ['workspace', 'conductor'],
         ])
       })
 
@@ -219,6 +221,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
           ['workspace', 'project-snapshots'],
           ['workspace', 'layout', 'project-detail'],
           ['workspace', 'stats'],
+          ['workspace', 'conductor'],
           ['workspace', 'conductor', 'recent-missions'],
         ])
       })

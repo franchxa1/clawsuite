@@ -1,16 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import type Database from 'better-sqlite3'
-import { ClaudeAdapter } from './adapters/claude'
-import { CodexAdapter } from './adapters/codex'
-import { OpenClawAdapter } from './adapters/openclaw'
-import type { AgentAdapter, AgentAdapterContext } from './adapters/types'
+import { AGENT_EXECUTION_DISABLED_MESSAGE } from './agent-execution-disabled'
 import { getDatabase } from './db'
 import type {
   ActivityLogEntry,
   ActivityEvent,
   ApprovalTier,
-  AgentExecutionResult,
   AgentDirectoryRecord,
   AgentDirectoryStats,
   AgentRecord,
@@ -42,15 +38,6 @@ import type {
   UpdateTaskInput,
 } from './types'
 
-const QA_MISSION_NAME = '__qa__'
-const QA_PHASE_NAME = 'QA'
-
-type QaReviewPayload = {
-  approved: boolean
-  issues: string[]
-  riskLevel: 'low' | 'medium' | 'high'
-}
-
 type CheckpointRow = Omit<Checkpoint, 'qa_result'> & {
   qa_result?: string | null
 }
@@ -78,64 +65,6 @@ function hydrateCheckpoint<T extends CheckpointRow>(checkpoint: T): T & Checkpoi
         ? parseJsonOrDefault<QAResult | null>(checkpoint.qa_result, null)
         : checkpoint.qa_result ?? null,
   }
-}
-
-function isOnlineAgent(agent: AgentRecord | null): agent is AgentRecord {
-  return agent !== null && (agent.status === 'online' || agent.status === 'idle')
-}
-
-function normalizeIssueList(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-}
-
-function parseQaReviewPayload(result: AgentExecutionResult): QaReviewPayload | null {
-  const candidates = [result.checkpointSummary, result.summary].filter(
-    (value): value is string => typeof value === 'string' && value.trim().length > 0,
-  )
-
-  for (const candidate of candidates) {
-    const trimmed = candidate.trim()
-    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-    const jsonSource = fencedMatch?.[1]?.trim() ?? trimmed
-    const start = jsonSource.indexOf('{')
-    const end = jsonSource.lastIndexOf('}')
-
-    if (start === -1 || end === -1 || end <= start) {
-      continue
-    }
-
-    try {
-      const parsed = JSON.parse(
-        jsonSource.slice(start, end + 1),
-      ) as Record<string, unknown>
-      const approved = parsed.approved
-      const riskLevel = parsed.riskLevel
-
-      if (
-        typeof approved !== 'boolean' ||
-        (riskLevel !== 'low' && riskLevel !== 'medium' && riskLevel !== 'high')
-      ) {
-        continue
-      }
-
-      return {
-        approved,
-        issues: normalizeIssueList(parsed.issues),
-        riskLevel,
-      }
-    } catch {
-      continue
-    }
-  }
-
-  return null
 }
 
 const DEFAULT_AGENT_DIRECTORY: AgentDirectoryRecord[] = [
@@ -373,16 +302,10 @@ function hydrateTeam(row: TeamRow): Team {
 
 export class Tracker extends EventEmitter {
   private readonly db: Database.Database
-  private readonly adapters: Map<string, AgentAdapter>
 
   constructor(db = getDatabase()) {
     super()
     this.db = db
-    this.adapters = new Map<string, AgentAdapter>([
-      ['codex', new CodexAdapter()],
-      ['claude', new ClaudeAdapter()],
-      ['openclaw', new OpenClawAdapter()],
-    ])
   }
 
   listProjects(): Array<
@@ -837,8 +760,8 @@ export class Tracker extends EventEmitter {
   createTask(input: CreateTaskInput): Task {
     const task = this.db
       .prepare(
-        `INSERT INTO tasks (mission_id, name, description, agent_id, status, sort_order, depends_on)
-         VALUES (@mission_id, @name, @description, @agent_id, @status, @sort_order, @depends_on)
+        `INSERT INTO tasks (mission_id, name, description, agent_id, agent_type, status, sort_order, depends_on)
+         VALUES (@mission_id, @name, @description, @agent_id, @agent_type, @status, @sort_order, @depends_on)
          RETURNING *`,
       )
       .get({
@@ -846,6 +769,7 @@ export class Tracker extends EventEmitter {
         name: input.name,
         description: input.description ?? null,
         agent_id: input.agent_id ?? null,
+        agent_type: input.agent_type ?? null,
         status: input.status ?? 'pending',
         sort_order: input.sort_order ?? 0,
         depends_on: input.depends_on ? JSON.stringify(input.depends_on) : null,
@@ -863,13 +787,16 @@ export class Tracker extends EventEmitter {
     this.db
       .prepare(
         `UPDATE tasks
-         SET name = ?, description = ?, agent_id = ?, status = ?, sort_order = ?, depends_on = ?
+         SET name = ?, description = ?, agent_id = ?, agent_type = ?, status = ?, sort_order = ?, depends_on = ?
          WHERE id = ?`,
       )
       .run(
         updates.name ?? existing.name,
         updates.description ?? existing.description,
         updates.agent_id ?? existing.agent_id,
+        Object.prototype.hasOwnProperty.call(updates, 'agent_type')
+          ? updates.agent_type ?? null
+          : existing.agent_type ?? null,
         updates.status ?? existing.status,
         updates.sort_order ?? existing.sort_order,
         updates.depends_on
@@ -1798,144 +1725,11 @@ export class Tracker extends EventEmitter {
     taskId: string,
     workspacePath: string | null,
   ): Promise<boolean> {
-    if (!workspacePath) {
-      return false
-    }
-
-    const agent = this.getAgent('aurora-qa')
-    if (!isOnlineAgent(agent)) {
-      return false
-    }
-
-    const checkpoint = this.getCheckpoint(checkpointId)
-    const project = this.getProject(projectId)
-    const sourceTask = this.getTask(taskId)
-    if (!checkpoint || !project || !sourceTask) {
-      return false
-    }
-
-    const qaMission = this.ensureQaMission(projectId)
-    const qaTask = this.createTask({
-      mission_id: qaMission.id,
-      name: `QA review ${checkpointId}`,
-      description: [
-        `Review checkpoint ${checkpointId}. Diff summary: ${checkpoint.summary ?? 'No diff summary available'}. Project: ${project.name}. Task: ${sourceTask.name}.`,
-        `Check: (1) tsc errors in ${workspacePath}, (2) correctness of changes, (3) regression risk.`,
-        'Return JSON: { approved: boolean, issues: string[], riskLevel: low|medium|high }',
-      ].join(' '),
-      agent_id: agent.id,
-    })
-
-    this.startMission(qaMission.id)
-    this.setTaskStatus(qaTask.id, 'running')
-    this.setAgentStatus(agent.id, 'running')
-
-    const taskRun = this.createTaskRun(qaTask.id, agent.id, workspacePath, 1)
-    this.markTaskRunStarted(taskRun.id)
-    this.logAuditEvent('task.started', taskRun.id, 'task_run')
-
-    const prompt = agent.system_prompt?.trim()
-      ? `${agent.system_prompt.trim()}\n\n---\n\n${qaTask.description ?? qaTask.name}`
-      : qaTask.description ?? qaTask.name
-
-    try {
-      this.appendRunEvent(taskRun.id, 'started', {
-        taskId: qaTask.id,
-        agentId: agent.id,
-        workspacePath,
-        attempt: 1,
-      })
-
-      const result = await this.getAdapter(agent.adapter_type).execute(
-        {
-          task: qaTask,
-          taskRun,
-          agent,
-          workspacePath,
-          projectName: project.name,
-          prompt,
-        },
-        {
-          tracker: this,
-          onEvent: (event) => {
-            this.appendRunEvent(
-              taskRun.id,
-              event.type === 'agent_message' ? 'output' : (event.type as any),
-              {
-                message: event.message ?? null,
-                ...event.data,
-              },
-            )
-          },
-        } satisfies AgentAdapterContext,
-      )
-
-      if (result.status === 'completed') {
-        this.completeTaskRun(taskRun.id, {
-          status: 'completed',
-          error: result.error ?? null,
-          input_tokens: result.inputTokens,
-          output_tokens: result.outputTokens,
-          cost_cents: result.costCents,
-        })
-        this.logAuditEvent('task.completed', taskRun.id, 'task_run')
-        this.setTaskStatus(qaTask.id, 'completed')
-
-        const parsed = parseQaReviewPayload(result)
-        if (!parsed) {
-          this.updateCheckpointStatus(
-            checkpointId,
-            'pending',
-            'QA review did not return valid JSON output.',
-          )
-          return true
-        }
-
-        if (parsed.approved && parsed.riskLevel !== 'high') {
-          this.approveCheckpoint(
-            checkpointId,
-            parsed.issues.length > 0 ? parsed.issues.join('\n') : undefined,
-          )
-        } else {
-          this.updateCheckpointStatus(
-            checkpointId,
-            'pending',
-            parsed.issues.length > 0
-              ? parsed.issues.join('\n')
-              : `QA marked checkpoint ${parsed.riskLevel} risk.`,
-          )
-        }
-        return true
-      }
-
-      const errorMessage = result.error ?? result.summary
-      this.failTaskRun(taskRun.id, errorMessage, {
-        input_tokens: result.inputTokens,
-        output_tokens: result.outputTokens,
-        cost_cents: result.costCents,
-      })
-      this.logAuditEvent('task.failed', taskRun.id, 'task_run')
-      this.setTaskStatus(qaTask.id, 'failed')
-      this.updateCheckpointStatus(
-        checkpointId,
-        'pending',
-        `QA review failed: ${errorMessage}`,
-      )
-      return true
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      this.failTaskRun(taskRun.id, message)
-      this.logAuditEvent('task.failed', taskRun.id, 'task_run')
-      this.setTaskStatus(qaTask.id, 'failed')
-      this.updateCheckpointStatus(
-        checkpointId,
-        'pending',
-        `QA review failed: ${message}`,
-      )
-      return true
-    } finally {
-      this.setAgentStatus(agent.id, 'idle')
-    }
+    void checkpointId
+    void projectId
+    void taskId
+    void workspacePath
+    throw new Error(AGENT_EXECUTION_DISABLED_MESSAGE)
   }
 
   listAgents(): AgentRecord[] {
@@ -2575,42 +2369,6 @@ export class Tracker extends EventEmitter {
     return row ?? {}
   }
 
-  private ensureQaMission(projectId: string): Mission {
-    const existingMission =
-      (this.db
-        .prepare(
-          `SELECT missions.*
-           FROM missions
-           JOIN phases ON phases.id = missions.phase_id
-           WHERE phases.project_id = ? AND missions.name = ?
-           ORDER BY missions.rowid DESC
-           LIMIT 1`,
-        )
-        .get(projectId, QA_MISSION_NAME) as Mission | undefined) ?? null
-    if (existingMission) {
-      return existingMission
-    }
-
-    const projectDetail = this.getProjectDetail(projectId)
-    if (!projectDetail) {
-      throw new Error('Project not found')
-    }
-
-    const phase =
-      projectDetail.phases.find((entry) => entry.status === 'active') ??
-      projectDetail.phases.find((entry) => entry.status === 'pending') ??
-      this.createPhase({
-        project_id: projectId,
-        name: QA_PHASE_NAME,
-        sort_order: projectDetail.phases.length,
-      })
-
-    return this.createMission({
-      phase_id: phase.id,
-      name: QA_MISSION_NAME,
-    })
-  }
-
   private getMissionProjectContext(missionId: string): Record<string, unknown> {
     const row = this.db
       .prepare(
@@ -2684,14 +2442,6 @@ export class Tracker extends EventEmitter {
       | undefined
 
     return row ?? {}
-  }
-
-  private getAdapter(type: string): AgentAdapter {
-    const adapter = this.adapters.get(type)
-    if (!adapter) {
-      throw new Error(`Unsupported adapter type: ${type}`)
-    }
-    return adapter
   }
 
   private emitSse(event: string, payload: unknown): void {

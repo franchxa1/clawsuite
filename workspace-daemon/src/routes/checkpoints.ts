@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { execFile, execSync } from "node:child_process";
 import { promisify } from "node:util";
 import { type Response, Router } from "express";
+import { AGENT_EXECUTION_DISABLED_MESSAGE } from "../agent-execution-disabled";
 import {
   cleanupWorktree,
   createPullRequest,
@@ -10,7 +11,6 @@ import {
   hasGitRemote,
   mergeWorktreeToMain,
 } from "../git-ops";
-import { OpenClawAdapter } from "../adapters/openclaw";
 import { Orchestrator } from "../orchestrator";
 import { Tracker } from "../tracker";
 import { runVerification, runFullVerification, type VerificationResult, type FullVerificationResult } from "../verification";
@@ -680,20 +680,8 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
     const sessionId = tracker.getTaskRunSessionId(checkpoint.task_run_id);
     let resumed = false;
     if (sessionId) {
-      const reason = reviewerNotes?.trim() || "No reason provided";
-
-      try {
-        await new OpenClawAdapter().steerSession(
-          sessionId,
-          `Checkpoint rejected. Reason: ${reason}. Please revise.`,
-        );
-        resumed = true;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to steer OpenClaw session";
-        res.status(500).json({ error: message });
-        return;
-      }
+      res.status(503).json({ error: AGENT_EXECUTION_DISABLED_MESSAGE });
+      return;
     }
 
     if (sessionId && resumed) {
@@ -753,7 +741,14 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
       taskRun.attempt + 1,
     );
     tracker.setTaskStatus(task.id, "pending");
-    const triggered = await orchestrator.triggerTask(task.id);
+    let triggered = false;
+    try {
+      triggered = await orchestrator.triggerTask(task.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Internal error";
+      res.status(503).json({ error: message });
+      return;
+    }
     if (!triggered) {
       tracker.updateTaskRun(nextRun.id, {
         status: "failed",

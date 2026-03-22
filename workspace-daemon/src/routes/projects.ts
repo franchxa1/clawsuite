@@ -1,10 +1,93 @@
 import { execFile } from 'node:child_process'
+import { readdir, readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { promisify } from 'node:util'
 import { Router } from 'express'
 import { Tracker } from '../tracker'
 import { runFullVerification, type FullVerificationResult } from '../verification'
 
 const execFileAsync = promisify(execFile)
+const MAX_FILE_TREE_DEPTH = 3
+const MAX_TEXT_FILE_SIZE = 30 * 1024
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist'])
+const TEXT_FILE_EXTENSIONS = new Set([
+  '.css',
+  '.csv',
+  '.env',
+  '.gitignore',
+  '.html',
+  '.js',
+  '.json',
+  '.jsx',
+  '.md',
+  '.mjs',
+  '.sql',
+  '.svg',
+  '.ts',
+  '.tsx',
+  '.txt',
+  '.xml',
+  '.yaml',
+  '.yml',
+])
+
+type ProjectFileEntry = {
+  relativePath: string
+  size: number
+  isText: boolean
+  content?: string
+}
+
+function getDirentParent(entry: unknown): string | undefined {
+  if (!entry || typeof entry !== 'object') return undefined
+  const record = entry as { parentPath?: unknown; path?: unknown }
+  if (typeof record.parentPath === 'string') return record.parentPath
+  if (typeof record.path === 'string') return record.path
+  return undefined
+}
+
+function isTextFile(filePath: string): boolean {
+  return TEXT_FILE_EXTENSIONS.has(path.extname(filePath).toLowerCase())
+}
+
+function getPathDepth(relativePath: string): number {
+  return relativePath.split(path.sep).filter(Boolean).length
+}
+
+async function readProjectFiles(projectPath: string): Promise<ProjectFileEntry[]> {
+  const entries = await readdir(projectPath, { recursive: true, withFileTypes: true })
+  const files: ProjectFileEntry[] = []
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue
+
+    const parentPath = getDirentParent(entry) ?? projectPath
+    const absolutePath = path.join(parentPath, entry.name)
+    const relativePath = path.relative(projectPath, absolutePath)
+    if (!relativePath || relativePath.startsWith('..')) continue
+
+    const segments = relativePath.split(path.sep)
+    if (segments.some((segment) => SKIP_DIRS.has(segment))) continue
+    if (getPathDepth(relativePath) > MAX_FILE_TREE_DEPTH) continue
+
+    const buffer = await readFile(absolutePath)
+    const size = buffer.byteLength
+    const content =
+      isTextFile(relativePath) && size <= MAX_TEXT_FILE_SIZE
+        ? buffer.toString('utf8')
+        : undefined
+
+    files.push({
+      relativePath,
+      size,
+      isText: content !== undefined,
+      content,
+    })
+  }
+
+  files.sort((left, right) => left.relativePath.localeCompare(right.relativePath))
+  return files
+}
 
 async function runGitCommand(projectPath: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', args, {
@@ -172,6 +255,30 @@ export function createProjectsRouter(tracker: Tracker): Router {
     }
 
     res.json(await getProjectGitStatus(project.path))
+  })
+
+  router.get('/:id/files', async (req, res) => {
+    const project = tracker.getProject(req.params.id)
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' })
+      return
+    }
+
+    if (!project.path) {
+      res.status(400).json({ error: 'Project path not configured' })
+      return
+    }
+
+    try {
+      const files = await readProjectFiles(project.path)
+      res.json({
+        projectPath: project.path,
+        files,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load project files'
+      res.status(500).json({ error: message })
+    }
   })
 
   router.put('/:id', (req, res) => {

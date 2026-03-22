@@ -1,16 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { isAuthenticated } from '../../../server/auth-middleware'
 import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
-} from '../../server/rate-limit'
-import { forwardWorkspaceRequest } from '../../server/workspace-proxy'
+} from '../../../server/rate-limit'
+import { forwardWorkspaceRequest } from '../../../server/workspace-proxy'
 
-export const Route = createFileRoute('/api/workspace-tasks')({
+export const Route = createFileRoute('/api/workspace/tasks')({
   server: {
     handlers: {
       GET: async ({ request }) => {

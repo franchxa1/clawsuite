@@ -13,11 +13,12 @@ export function createTasksRouter(tracker: Tracker, orchestrator: Orchestrator):
   });
 
   router.post("/", (req, res) => {
-    const { mission_id, name, description, agent_id, status, sort_order, depends_on } = req.body as {
+    const { mission_id, name, description, agent_id, agent_type, status, sort_order, depends_on } = req.body as {
       mission_id?: string;
       name?: string;
       description?: string | null;
       agent_id?: string | null;
+      agent_type?: string | null;
       status?: TaskStatus;
       sort_order?: number;
       depends_on?: string[] | null;
@@ -38,11 +39,21 @@ export function createTasksRouter(tracker: Tracker, orchestrator: Orchestrator):
       return;
     }
 
+    if (
+      agent_type !== undefined &&
+      agent_type !== null &&
+      (typeof agent_type !== "string" || agent_type.trim().length === 0)
+    ) {
+      res.status(400).json({ error: "agent_type must be a non-empty string or null" });
+      return;
+    }
+
     const task = tracker.createTask({
       mission_id,
       name: name.trim(),
       description: typeof description === "string" ? description.trim() : description,
       agent_id,
+      agent_type: typeof agent_type === "string" ? agent_type.trim() : agent_type,
       status,
       sort_order,
       depends_on,
@@ -60,7 +71,14 @@ export function createTasksRouter(tracker: Tracker, orchestrator: Orchestrator):
   });
 
   router.post("/:id/run", async (req, res) => {
-    const triggered = await orchestrator.triggerTask(req.params.id);
+    let triggered = false;
+    try {
+      triggered = await orchestrator.triggerTask(req.params.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Internal error";
+      res.status(503).json({ error: message });
+      return;
+    }
     if (!triggered) {
       res.status(404).json({ error: "Task not found" });
       return;
