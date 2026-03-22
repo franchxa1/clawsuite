@@ -642,7 +642,7 @@ export function useConductorWorkspace(options?: {
     queryKey: ['workspace', 'conductor', 'recent-missions'],
     enabled,
     queryFn: async () => parseRecentMissions(await workspaceJson('/api/workspace/missions')),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
     ...RESILIENT_QUERY_OPTIONS,
   })
 

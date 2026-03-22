@@ -114,6 +114,10 @@ function getTaskStatusDot(status: string): { dotClass: string; label: string } {
   return { dotClass: 'bg-[var(--theme-border2)]', label: 'Pending' }
 }
 
+function isRunningMissionStatus(status: string | null | undefined): boolean {
+  return status === 'running' || status === 'active' || status === 'paused'
+}
+
 function getCodeLanguage(filePath: string): string {
   const extension = filePath.split('.').pop()?.toLowerCase()
   switch (extension) {
@@ -390,6 +394,10 @@ export function Conductor() {
   const recentMissions = useMemo(() => {
     return [...(workspace.recentMissions.data ?? [])]
       .sort((left, right) => {
+        const leftRunning = isRunningMissionStatus(left.status)
+        const rightRunning = isRunningMissionStatus(right.status)
+        if (leftRunning && !rightRunning) return -1
+        if (!leftRunning && rightRunning) return 1
         const leftTime = new Date(left.updated_at ?? left.created_at ?? 0).getTime()
         const rightTime = new Date(right.updated_at ?? right.created_at ?? 0).getTime()
         return rightTime - leftTime
@@ -785,6 +793,7 @@ export function Conductor() {
               <div className="w-full space-y-1.5">
                 {pageMissions.map((mission) => {
                   const statusDot = getTaskStatusDot(mission.status)
+                  const isRunning = isRunningMissionStatus(mission.status)
                   const timeValue = mission.updated_at ?? mission.created_at
                   return (
                     <button
@@ -794,15 +803,26 @@ export function Conductor() {
                         setActiveMissionId(mission.id)
                         setActiveProjectId(mission.project_id ?? null)
                       }}
-                      className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                      className={cn(
+                        'flex w-full min-w-0 items-center gap-3 rounded-xl border bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--theme-accent-soft)]',
+                        isRunning
+                          ? 'border-sky-400/30 hover:border-sky-400/50'
+                          : 'border-[var(--theme-border)] hover:border-[var(--theme-accent)]',
+                      )}
                     >
                       <span className={cn('size-2 shrink-0 rounded-full', statusDot.dotClass)} />
                       <p className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">
                         {mission.name}
                       </p>
-                      <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
-                        {statusDot.label}
-                      </span>
+                      {isRunning ? (
+                        <span className="shrink-0 rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-600">
+                          Running
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
+                          {statusDot.label}
+                        </span>
+                      )}
                       <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
                         {timeValue ? formatRelativeTime(timeValue) : ''}
                       </span>
