@@ -83,6 +83,28 @@ export type WorkspaceProject = {
   status: string
 }
 
+export type WorkspaceRecentMission = {
+  id: string
+  name: string
+  status: string
+  project_id?: string
+  phase_id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type WorkspaceProjectFile = {
+  relativePath: string
+  size: number
+  isText: boolean
+  content?: string
+}
+
+export type WorkspaceProjectFiles = {
+  projectPath: string
+  files: WorkspaceProjectFile[]
+}
+
 // ── API helpers ──────────────────────────────────────────────────────────────
 
 async function workspaceJson<T = unknown>(
@@ -284,6 +306,55 @@ function parseProject(payload: unknown): WorkspaceProject | null {
     path: asString(project.path) ?? undefined,
     status: asString(project.status) ?? 'ready',
   }
+}
+
+function parseRecentMissions(payload: unknown): WorkspaceRecentMission[] {
+  const items = Array.isArray(payload) ? payload : []
+  const missions: WorkspaceRecentMission[] = []
+
+  for (const item of items) {
+    const record = asRecord(item)
+    if (!record) continue
+    const id = asString(record.id)
+    if (!id) continue
+
+    missions.push({
+      id,
+      name: asString(record.name) ?? 'Mission',
+      status: asString(record.status) ?? 'pending',
+      project_id: asString(record.project_id) ?? undefined,
+      phase_id: asString(record.phase_id) ?? undefined,
+      created_at: asString(record.created_at) ?? undefined,
+      updated_at: asString(record.updated_at) ?? undefined,
+    })
+  }
+
+  return missions
+}
+
+function parseProjectFiles(payload: unknown): WorkspaceProjectFiles | null {
+  const record = asRecord(payload)
+  const projectPath = asString(record?.projectPath)
+  if (!projectPath) return null
+
+  const files: WorkspaceProjectFile[] = []
+  const items = Array.isArray(record?.files) ? record.files : []
+
+  for (const item of items) {
+    const file = asRecord(item)
+    if (!file) continue
+    const relativePath = asString(file.relativePath)
+    if (!relativePath) continue
+
+    files.push({
+      relativePath,
+      size: Math.max(0, asNumber(file.size) ?? 0),
+      isText: Boolean(file.isText),
+      content: asString(file.content) ?? undefined,
+    })
+  }
+
+  return { projectPath, files }
 }
 
 function extractEntityRecord(
@@ -521,6 +592,25 @@ export function useConductorWorkspace(options?: {
     ...RESILIENT_QUERY_OPTIONS,
   })
 
+  const recentMissionsQuery = useQuery({
+    queryKey: ['workspace', 'conductor', 'recent-missions'],
+    enabled,
+    queryFn: async () => parseRecentMissions(await workspaceJson('/api/workspace/missions')),
+    refetchInterval: 30_000,
+    ...RESILIENT_QUERY_OPTIONS,
+  })
+
+  const projectFilesQuery = useQuery({
+    queryKey: ['workspace', 'conductor', 'project-files', projectId],
+    enabled: enabled && Boolean(projectId),
+    queryFn: async () =>
+      parseProjectFiles(
+        await workspaceJson(`/api/workspace/projects/${encodeURIComponent(projectId!)}/files`),
+      ),
+    refetchInterval: 30_000,
+    ...RESILIENT_QUERY_OPTIONS,
+  })
+
   // ── Convenience: full launch sequence ────────────────────────────────────
 
   const launchMission = useCallback(
@@ -607,6 +697,8 @@ export function useConductorWorkspace(options?: {
     taskRuns: taskRunsQuery,
     checkpoints: checkpointsQuery,
     stats: statsQuery,
+    recentMissions: recentMissionsQuery,
+    projectFiles: projectFilesQuery,
 
     // Helpers
     invalidateAll: useCallback(() => {

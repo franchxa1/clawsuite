@@ -11,12 +11,14 @@ import {
 } from '@hugeicons/core-free-icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { CodeBlock } from '@/components/prompt-kit/code-block'
 import { cn } from '@/lib/utils'
 import { TerminalWorkspace } from '@/components/terminal/terminal-workspace'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { useWorkspaceSse } from '@/hooks/use-workspace-sse'
 import { getWorkspaceCheckpointDiff } from '@/lib/workspace-checkpoints'
 import { useConductorWorkspace, type WorkspaceMissionTask } from './hooks/use-conductor-workspace'
+import { formatRelativeTime } from '@/screens/projects/lib/workspace-utils'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +108,32 @@ function getTaskStatusDot(status: string): { dotClass: string; label: string } {
   return { dotClass: 'bg-[var(--theme-border2)]', label: 'Pending' }
 }
 
+function getCodeLanguage(filePath: string): string {
+  const extension = filePath.split('.').pop()?.toLowerCase()
+  switch (extension) {
+    case 'ts':
+    case 'tsx':
+    case 'js':
+    case 'jsx':
+    case 'json':
+    case 'html':
+    case 'css':
+    case 'md':
+    case 'sql':
+    case 'yml':
+    case 'yaml':
+      return extension
+    default:
+      return 'text'
+  }
+}
+
+function formatFileSize(size: number): string {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function Conductor() {
@@ -123,6 +151,7 @@ export function Conductor() {
   const [terminalExpanded, setTerminalExpanded] = useState(false)
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [liveOutputTick, setLiveOutputTick] = useState(0)
 
   // ── Workspace hook ────────────────────────────────────────────────────────
   const workspace = useConductorWorkspace({
@@ -150,7 +179,11 @@ export function Conductor() {
     if (phase !== 'active') return
     setNow(Date.now())
     const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
+    const liveId = window.setInterval(() => setLiveOutputTick((t) => t + 1), 2000)
+    return () => {
+      window.clearInterval(id)
+      window.clearInterval(liveId)
+    }
   }, [phase])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -261,7 +294,24 @@ export function Conductor() {
       }
     }
     return map
-  }, [runningRuns, queryClient])
+  }, [liveOutputTick, runningRuns, queryClient])
+
+  const recentMissions = useMemo(() => {
+    return [...(workspace.recentMissions.data ?? [])]
+      .sort((left, right) => {
+        const leftTime = new Date(left.updated_at ?? left.created_at ?? 0).getTime()
+        const rightTime = new Date(right.updated_at ?? right.created_at ?? 0).getTime()
+        return rightTime - leftTime
+      })
+      .slice(0, 10)
+  }, [workspace.recentMissions.data])
+
+  const handleOpenHtmlPreview = useCallback((content: string) => {
+    const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }, [])
 
   // Map task_id → run for quick lookup
   const runByTaskId = useMemo(
@@ -342,6 +392,49 @@ export function Conductor() {
                 </Button>
               </div>
             </section>
+
+            {recentMissions.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                    Recent Missions
+                  </h2>
+                  <span className="text-xs text-[var(--theme-muted-2)]">
+                    Last {recentMissions.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {recentMissions.map((mission) => {
+                    const statusDot = getTaskStatusDot(mission.status)
+                    const timeValue = mission.updated_at ?? mission.created_at
+                    return (
+                      <button
+                        key={mission.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveMissionId(mission.id)
+                          setActiveProjectId(mission.project_id ?? null)
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                      >
+                        <span className={cn('size-2.5 shrink-0 rounded-full', statusDot.dotClass)} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                            {mission.name}
+                          </p>
+                          <p className="text-xs text-[var(--theme-muted-2)]">
+                            {statusDot.label}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">
+                          {timeValue ? formatRelativeTime(timeValue) : 'just now'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
           </div>
         </main>
       </div>
@@ -501,6 +594,74 @@ export function Conductor() {
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {workspace.projectFiles.data && (
+                <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                        Output Files
+                      </h2>
+                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
+                        {workspace.projectFiles.data.projectPath}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs text-[var(--theme-muted)]">
+                      {workspace.projectFiles.data.files.length} files
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {workspace.projectFiles.data.files.map((file) => (
+                      <details
+                        key={file.relativePath}
+                        className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
+                      >
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                              {file.relativePath}
+                            </p>
+                            <p className="text-xs text-[var(--theme-muted-2)]">
+                              {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
+                            </p>
+                          </div>
+                          {file.relativePath.endsWith('.html') && file.content ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                handleOpenHtmlPreview(file.content!)
+                              }}
+                              className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)] transition-colors hover:bg-[var(--theme-accent-soft-strong)]"
+                            >
+                              Open Preview
+                            </button>
+                          ) : (
+                            <span className="text-xs text-[var(--theme-muted-2)]">Expand</span>
+                          )}
+                        </summary>
+                        {file.isText && file.content ? (
+                          <div className="border-t border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+                            <CodeBlock
+                              content={file.content}
+                              language={getCodeLanguage(file.relativePath)}
+                              className="border-[var(--theme-border)]"
+                            />
+                          </div>
+                        ) : (
+                          <div className="border-t border-[var(--theme-border)] px-4 py-3 text-sm text-[var(--theme-muted)]">
+                            Preview unavailable for this file.
+                          </div>
+                        )}
+                      </details>
+                    ))}
+                    {workspace.projectFiles.data.files.length === 0 && (
+                      <p className="text-sm text-[var(--theme-muted)]">No output files found.</p>
+                    )}
                   </div>
                 </div>
               )}
