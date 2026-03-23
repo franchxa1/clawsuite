@@ -3,6 +3,18 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { Tracker } from "../tracker";
 
+/** Read hooks.token from openclaw.json so the daemon auto-discovers it. */
+function resolveHooksToken(): string {
+  try {
+    const configPath = join(process.env.HOME || "", ".openclaw/openclaw.json");
+    if (!existsSync(configPath)) return "";
+    const cfg = JSON.parse(readFileSync(configPath, "utf-8"));
+    return typeof cfg?.hooks?.token === "string" ? cfg.hooks.token : "";
+  } catch {
+    return "";
+  }
+}
+
 function slugify(value: string): string {
   const slug = value
     .toLowerCase()
@@ -24,7 +36,7 @@ function fireDispatchTrigger(missionId: string, mission: string): void {
   // Use gateway hooks/agent endpoint to spawn an isolated agent session.
   // This creates an independent session that can use sessions_spawn — no chat session dependency.
   const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
-  const hooksToken = process.env.OPENCLAW_HOOKS_TOKEN ?? "";
+  const hooksToken = process.env.OPENCLAW_HOOKS_TOKEN ?? resolveHooksToken();
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (hooksToken) {
