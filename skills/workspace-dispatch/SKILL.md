@@ -1,170 +1,112 @@
 ---
 name: workspace-dispatch
 description: |
-  Autonomous multi-agent mission orchestrator. Decomposes a mission into tasks, spawns sub-agents for each step, reviews output against exit criteria, and chains tasks automatically with retry. State persists to disk so missions survive context loss. Triggered by the Conductor UI or by direct user request.
+  Single-agent mission orchestrator. Decomposes a mission into tasks, spawns one worker per task using the default model, verifies exit criteria, and chains tasks with retry. No critic pattern — each worker self-verifies. Simple, fast, works with any model config.
 ---
 
-# Workspace Dispatch
+# Workspace Dispatch (Single Agent)
 
-You are an autonomous mission orchestrator. When triggered, you decompose work into tasks, spawn sub-agents, review their output, and chain to the next task — all without user intervention.
+You are an autonomous mission orchestrator. Decompose work into tasks, spawn one worker per task, verify output, chain to the next — no user intervention needed.
 
-## Quick Reference
+## Flow
 
-| Step | What Happens |
-|------|-------------|
-| 1. Receive | Conductor sends a mission goal |
-| 2. Decompose | Break goal into 2-8 tasks with exit criteria |
-| 3. Loop | For each task: spawn worker → wait → verify → approve/retry |
-| 4. Complete | All tasks done → report summary |
+1. **Decompose** the goal into 2-6 tasks with machine-checkable exit criteria
+2. **For each task**: spawn a worker → wait → verify exit criteria → approve or retry
+3. **Report** summary when all tasks complete
 
-## Auto-Decompose
+## Decomposition Rules
 
-When you receive a mission goal, decompose it into concrete tasks:
-
-1. **What type of work?** coding / research / review / mixed
-2. **What are the deliverables?** Files, reports, configurations
-3. **What order?** Dependencies between tasks
-4. **How to verify?** Machine-checkable exit criteria for each task
-
-### Decomposition Rules
-- **Max 8 tasks** — if it needs more, the mission is too big
+- **Max 6 tasks** — keep it focused
 - **Every task needs exit criteria** verifiable with shell commands:
-  - `test -f /path/to/file` — file exists
-  - `npx tsc --noEmit` — TypeScript compiles
+  - `test -f /path` — file exists
+  - `npx tsc --noEmit` — compiles
   - `grep -q "keyword" /path` — contains expected content
-  - `wc -c < /path` — file has content
-- **No vague criteria** like "code is clean" — must be machine-checkable
-- **Include a final verification task** that depends on all coding tasks
-- **For coding tasks**: include working directory and expected output path
+  - `wc -c < /path | awk '$1 > 100'` — file has real content
+- **No vague criteria** — must be machine-checkable
+- **Include working directory** (`cwd`) for each task
+- **Each task is independent** — worker gets full context, no shared state between workers
 
-### Task Types
-| Type | What the Agent Does | Verify With |
-|------|-------------------|-------------|
-| coding | Write code, create files, run builds | file exists, tsc passes, tests pass |
-| research | Search web, read docs, synthesize | output file exists, has content |
-| review | Read code, run tests, check behavior | reviewer reports PASS |
-| planning | Analyze problem, produce plan | output file exists |
+## Task Types
 
-## The Dispatch Loop
+| Type | Worker Does | Verify With |
+|------|-----------|-------------|
+| coding | Write code, create files | file exists, tsc passes |
+| research | Search, read, synthesize | output file exists with content |
+| review | Read code, check behavior | reviewer outputs PASS verdict |
+
+## Dispatch Loop
 
 ```
-LOOP:
-  1. Find next task: status=pending AND all depends_on are completed
-  2. If no pending + all complete → MISSION DONE
-  3. If no pending + some failed → MISSION PARTIAL (report what succeeded)
-  
-  4. Spawn worker:
+For each task (in dependency order):
+  1. Spawn worker:
      sessions_spawn(
-       task: <task prompt>,
-       label: "worker-<slug>",
+       task: <worker prompt>,
+       label: "worker-<task-slug>",
        mode: "run",
        runTimeoutSeconds: 600
      )
-  
-  5. sessions_yield() → wait for worker to complete
-  
-  6. VERIFY exit criteria:
-     - Run each criterion via exec commands
-     - ALL must pass → APPROVE
-     - Any fails → RETRY
-  
-  7. APPROVE: mark task completed, continue loop
-  
-  RETRY:
-     - Increment retry count
-     - If retries >= 3 → FAIL task, skip dependents, continue loop
-     - Else: re-spawn with error context injected into prompt
+  2. sessions_yield() — wait for worker
+  3. Verify exit criteria via exec commands
+  4. If ALL pass → mark complete, next task
+  5. If ANY fail → retry (max 3) with error context, then fail + skip dependents
 ```
 
-## Worker Prompt Template
+## Worker Prompt
 
-For each task, give the worker everything it needs:
+Give each worker everything it needs in one prompt:
 
 ```
 ## Mission: {goal}
-
 ## Your Task: {task.title}
-
 {task.description}
 
-## Working Directory
-{task.cwd}
+Working directory: {cwd}
 
-## Exit Criteria (ALL must be satisfied):
-{criteria listed}
+## Exit Criteria (you MUST satisfy ALL):
+- {criterion_1}
+- {criterion_2}
 
 ## Rules
 - Do NOT start servers or long-running processes
 - Do NOT modify files outside your working directory
-- Commit your changes when done
+- Verify your own work before finishing — run the exit criteria commands yourself
+- Commit when done
 ```
 
-If retrying, add:
+On retry, append:
 ```
-## ⚠️ PREVIOUS ATTEMPT FAILED (attempt {n}/3)
-Error: {error}
-Fix these issues.
+## ⚠️ Previous attempt failed (attempt {n}/3)
+Error: {what went wrong}
+Fix this specific issue.
 ```
-
-## Agent Selection
-
-Use whatever models are available in the user's OpenClaw config. Prefer:
-- **Free/OAuth models** over paid API models
-- **The default model** works for most tasks
-- **Coding tasks** benefit from models with strong code capabilities
-- **Research tasks** can use cheaper/faster models
-
-Do NOT hardcode specific model names. Use the default model unless the user has configured preferences.
-
-## Critic Pattern (for coding tasks)
-
-After a coding task passes exit criteria, spawn a separate reviewer:
-
-```
-sessions_spawn(
-  task: "Review this code for: {task.title}. Score 1-10. Output JSON: {\"score\": N, \"verdict\": \"approve\"|\"reject\", \"issues\": [...]}",
-  label: "critic-<task-id>",
-  mode: "run"
-)
-sessions_yield()
-```
-
-- Score >= 7 → approve
-- Score < 7 → retry with issues as feedback
-- **The builder never reviews its own work**
 
 ## Completion
 
-When all tasks are done, output a summary:
+When all tasks done, output:
 
 ```
 ✅ Mission complete: {goal}
 
 Tasks:
-- ✅ {task.title}
-- ✅ {task.title}
+- ✅ {title} — verified
+- ✅ {title} — verified
 
 Output: {project_path}
 Duration: {elapsed}
-Workers: {count} spawned
 ```
 
 ## Failure Handling
 
 | Failure | Action |
 |---------|--------|
-| Worker times out | Retry with shorter scope hint |
-| Worker fails | Retry with error in prompt |
-| Exit criteria fail | Retry with specific failure details |
-| Critic rejects | Retry with critic's issues |
-| Max retries (3) | Mark failed, skip dependents, continue |
+| Worker timeout | Retry with simpler scope |
+| Exit criteria fail | Retry with specific error |
+| 3 retries exhausted | Mark failed, skip dependents, continue |
 
-## What NOT to Do
+## Rules
 
-- ❌ Hold state only in context — always be ready for context loss
-- ❌ Spawn > 2 workers in parallel on the same directory
-- ❌ Let a coder review its own work
-- ❌ Retry infinitely — 3 max then move on
-- ❌ Skip verification — always check exit criteria
-- ❌ Start servers in tasks — they block and timeout
-- ❌ Hardcode model names — use whatever's available
+- One worker per task, default model, no critic
+- Workers self-verify (exit criteria are the quality gate)
+- Don't hardcode model names — use whatever's available
+- Don't hold state in memory — be ready for context loss
+- Don't start servers in tasks
