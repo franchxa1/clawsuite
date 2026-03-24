@@ -211,6 +211,22 @@ function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string
 }
 
 function extractProjectPath(text: string): string | null {
+  const structuredPatterns = [
+    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s+(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
+    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s*:\s*(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
+  ]
+
+  for (const pattern of structuredPatterns) {
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(text)) !== null) {
+      const raw = match[1]
+      if (!raw) continue
+      const cleaned = raw.replace(/[.,;:!?`]+$/, '')
+      const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
+      if (normalized.startsWith('/tmp/dispatch-')) return normalized
+    }
+  }
+
   const matches = text.match(/\/tmp\/dispatch-[^\s"')`\]>]+/g) ?? []
   for (const raw of matches) {
     const cleaned = raw.replace(/[.,;:!?\-`]+$/, '')
@@ -290,6 +306,12 @@ export function Conductor() {
   const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
 
   const completePhaseProjectPath = useMemo(() => {
+    for (const task of conductor.tasks) {
+      if (!task.output) continue
+      const extractedPath = extractProjectPath(task.output)
+      if (extractedPath) return extractedPath
+    }
+
     const workerOutput = [
       ...Object.values(conductor.workerOutputs),
       ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
@@ -303,7 +325,21 @@ export function Conductor() {
 
     const candidates = buildProjectPathCandidates(conductor.workers, conductor.missionStartedAt)
     return candidates[0] ?? null
-  }, [conductor.streamText, conductor.workerOutputs, conductor.workers, conductor.missionStartedAt])
+  }, [conductor.tasks, conductor.streamText, conductor.workerOutputs, conductor.workers, conductor.missionStartedAt])
+
+  const completedTaskOutputs = useMemo(() => {
+    return conductor.tasks
+      .filter((task) => task.output)
+      .map((task) => ({
+        ...task,
+        extractedPath: extractProjectPath(task.output ?? ''),
+        previewUrl: (() => {
+          const extractedPath = extractProjectPath(task.output ?? '')
+          return extractedPath ? `/api/preview-file?path=${encodeURIComponent(`${extractedPath}/index.html`)}` : null
+        })(),
+        previewText: (task.output ?? '').trim().slice(0, 200),
+      }))
+  }, [conductor.tasks])
 
   const completeSummary = useMemo(() => {
     if (phase !== 'complete') return null
@@ -628,6 +664,48 @@ export function Conductor() {
                     sandbox="allow-scripts"
                     title="Mission output preview"
                   />
+                </div>
+              </section>
+            )}
+
+            {conductor.tasks.length > 1 && completedTaskOutputs.length > 0 && (
+              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Task Outputs</p>
+                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Per-task output snapshots from completed workers.</p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {completedTaskOutputs.map((task) => (
+                    <div
+                      key={task.id}
+                      className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="size-2 rounded-full bg-emerald-400" />
+                            <p className="truncate text-sm font-medium text-[var(--theme-text)]">{task.title}</p>
+                          </div>
+                        </div>
+                        {task.previewUrl && (
+                          <a
+                            href={task.previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
+                          >
+                            Preview
+                          </a>
+                        )}
+                      </div>
+                      <p className="mt-3 text-sm text-[var(--theme-muted)]">
+                        {task.previewText}
+                        {(task.output ?? '').trim().length > 200 ? '…' : ''}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}
