@@ -189,7 +189,7 @@ export function Conductor() {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (conductor.phase === 'idle') return
+    if (conductor.phase === 'idle' || conductor.phase === 'complete') return
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [conductor.phase])
@@ -261,7 +261,7 @@ export function Conductor() {
       '✅ Mission completed successfully',
       '',
       `**Goal:** ${conductor.goal}`,
-      `**Duration:** ${formatElapsedTime(conductor.missionStartedAt, now)}`,
+      `**Duration:** ${formatElapsedTime(conductor.missionStartedAt, conductor.completedAt ? new Date(conductor.completedAt).getTime() : now)}`,
     ]
     if (totalWorkers > 0) {
       lines.push(`**Workers:** ${totalWorkers} ran · ${totalTokens.toLocaleString()} tokens`)
@@ -397,7 +397,7 @@ export function Conductor() {
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">Mission Complete</p>
                   <h1 className="mt-1 text-3xl font-semibold tracking-tight">{conductor.goal}</h1>
                   <p className="mt-2 text-sm text-[var(--theme-muted-2)]">
-                    {completedWorkers}/{Math.max(totalWorkers, completedWorkers)} workers finished · {formatElapsedTime(conductor.missionStartedAt, now)} total elapsed
+                    {completedWorkers}/{Math.max(totalWorkers, completedWorkers)} workers finished · {formatElapsedTime(conductor.missionStartedAt, conductor.completedAt ? new Date(conductor.completedAt).getTime() : now)} total elapsed
                   </p>
                 </div>
                 <div className="flex gap-2">
