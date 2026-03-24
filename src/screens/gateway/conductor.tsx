@@ -539,8 +539,8 @@ export function Conductor() {
 
   if (phase === 'complete') {
     return (
-      <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-full max-w-[960px] flex-col px-6 py-12">
+      <div className="min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto flex max-w-[960px] flex-col px-6 py-12 pb-24">
           <div className="space-y-6">
             <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
