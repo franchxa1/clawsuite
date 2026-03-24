@@ -222,7 +222,7 @@ export function Conductor() {
   const completedWorkers = conductor.workers.filter((worker) => worker.status === 'complete').length
   const activeWorkerCount = conductor.activeWorkers.length
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
-  const shouldCollapseLivePlanByDefault = totalWorkers > 0
+  const shouldCollapseLivePlanByDefault = false
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
   const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
 

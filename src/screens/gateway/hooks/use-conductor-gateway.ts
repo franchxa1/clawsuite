@@ -304,7 +304,7 @@ export function useConductorGateway() {
         })
     },
     enabled: phase !== 'idle',
-    refetchInterval: phase === 'decomposing' || phase === 'running' ? 3_000 : false,
+    refetchInterval: phase === 'decomposing' || phase === 'running' || (phase === 'complete' && Object.keys(workerOutputs).length === 0) ? 3_000 : false,
   })
 
   const recentSessionsQuery = useQuery({
