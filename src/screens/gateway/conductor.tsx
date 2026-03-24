@@ -416,8 +416,7 @@ export function Conductor() {
             <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Aurora Summary</p>
-                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Clean delivery summary first, raw agent output only when you need to debug it.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
                 </div>
                 <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
                   Complete
@@ -429,12 +428,28 @@ export function Conductor() {
                 ) : conductor.streamText ? (
                   <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
                 ) : (
-                  <p className="text-sm text-[var(--theme-muted)]">No streamed summary captured.</p>
+                  <p className="text-sm text-[var(--theme-muted)]">No summary captured.</p>
                 )}
               </div>
+              {conductor.workers.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {conductor.workers.map((worker, index) => {
+                    const persona = getAgentPersona(index)
+                    const shortModelName = getShortModelName(worker.model)
+                    return (
+                      <div key={worker.key} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
+                        <span className="size-2 rounded-full bg-emerald-400" />
+                        <span className="font-medium text-[var(--theme-text)]">{persona.emoji} {persona.name}</span>
+                        <span className="text-[var(--theme-muted)]">{worker.label}</span>
+                        <span className="ml-auto text-xs text-[var(--theme-muted)]">{shortModelName} · {worker.totalTokens.toLocaleString()} tok</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               {conductor.streamText && completeSummary && (
                 <details className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-                  <summary className="cursor-pointer text-sm font-medium text-[var(--theme-text)]">Raw Agent Output</summary>
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Raw Agent Output</summary>
                   <div className="mt-4 border-t border-[var(--theme-border)] pt-4">
                     <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
                   </div>
@@ -447,8 +462,16 @@ export function Conductor() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
-                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Previewing {completePhaseProjectPath}/index.html</p>
+                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{completePhaseProjectPath}/index.html</p>
                   </div>
+                  <a
+                    href={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
+                  >
+                    Open in new tab ↗
+                  </a>
                 </div>
                 <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-white">
                   <iframe
@@ -458,53 +481,8 @@ export function Conductor() {
                     title="Mission output preview"
                   />
                 </div>
-                <div className="mt-4 flex justify-end">
-                  <a
-                    href={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
-                  >
-                    Open in new tab ↗
-                  </a>
-                </div>
               </section>
             )}
-
-            <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Workers Summary</h2>
-              </div>
-              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-4">
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <span className="text-[var(--theme-muted)]">{conductor.workers.length} worker{conductor.workers.length !== 1 ? 's' : ''} ran</span>
-                  <span className="text-[var(--theme-muted)]">·</span>
-                  <span className="text-[var(--theme-muted)]">{totalTokens.toLocaleString()} total tokens</span>
-                  <span className="text-[var(--theme-muted)]">·</span>
-                  <span className="text-[var(--theme-muted)]">{conductor.workers.map((w) => getShortModelName(w.model)).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'Unknown'}</span>
-                </div>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {conductor.workers.map((worker, index) => {
-                  const dot = getWorkerDot(worker.status)
-                  const persona = getAgentPersona(index)
-                  const shortModelName = getShortModelName(worker.model)
-                  return (
-                    <div key={worker.key} className="flex flex-wrap items-center gap-3 rounded-xl border-l-2 border-l-emerald-400 bg-[var(--theme-card)] px-4 py-3">
-                      <span className={cn('size-2 rounded-full', dot.dotClass.replace(' animate-pulse', ''))} />
-                      <span className="text-sm font-medium text-[var(--theme-text)]">
-                        {persona.emoji} {persona.name}
-                      </span>
-                      <span className="truncate text-xs text-[var(--theme-muted)]">· {worker.label}</span>
-                      <span className="text-xs text-[var(--theme-muted)]">·</span>
-                      <span className="text-xs text-[var(--theme-muted)]">{shortModelName}</span>
-                      <span className="text-xs text-[var(--theme-muted)]">·</span>
-                      <span className="text-xs text-[var(--theme-muted)]">{worker.totalTokens.toLocaleString()} tok</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
           </div>
         </main>
       </div>
