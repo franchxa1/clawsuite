@@ -84,9 +84,21 @@ function deriveWorkerStatus(session: GatewaySession, updatedAt: string | null): 
   const staleness = updatedMs > 0 ? Date.now() - updatedMs : 0
   const totalTokens = readNumber(session.totalTokens) ?? readNumber(session.tokenCount) ?? 0
 
-  if (totalTokens > 0 && staleness > 30_000) return 'complete'
+  if (totalTokens > 0 && staleness > 10_000) return 'complete'
   if (staleness > 120_000) return 'stale'
   return 'running'
+}
+
+function workersLookComplete(workers: ConductorWorker[], staleAfterMs: number): boolean {
+  if (workers.length === 0) return false
+
+  return workers.every((worker) => {
+    if (worker.totalTokens <= 0) return false
+    if (!worker.updatedAt) return false
+    const updatedMs = new Date(worker.updatedAt).getTime()
+    if (!Number.isFinite(updatedMs)) return false
+    return Date.now() - updatedMs >= staleAfterMs
+  })
 }
 
 function formatDisplayName(session: GatewaySession): string {
@@ -246,6 +258,7 @@ export function useConductorGateway() {
   const [phase, setPhase] = useState<MissionPhase>('idle')
   const [goal, setGoal] = useState('')
   const [streamText, setStreamText] = useState('')
+  const [planText, setPlanText] = useState('')
   const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([])
   const [missionStartedAt, setMissionStartedAt] = useState<string | null>(null)
   const [completedAt, setCompletedAt] = useState<string | null>(null)
@@ -255,6 +268,7 @@ export function useConductorGateway() {
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>({})
   const fetchedWorkerOutputsRef = useRef<Set<string>>(new Set())
   const doneRef = useRef(false)
+  const seenToolCallRef = useRef(false)
 
   const sessionsQuery = useQuery({
     queryKey: ['conductor', 'gateway', 'sessions'],
@@ -328,11 +342,19 @@ export function useConductorGateway() {
 
   useEffect(() => {
     if (phase !== 'running') return
+
+    const shouldCompleteImmediately = doneRef.current && workersLookComplete(workers, 8_000)
+    if (shouldCompleteImmediately) {
+      setPhase('complete')
+      setCompletedAt((value) => value ?? new Date().toISOString())
+      return
+    }
+
     if (activeWorkers.length > 0) return
     if (workers.length === 0 && !doneRef.current) return
     setPhase('complete')
     setCompletedAt((value) => value ?? new Date().toISOString())
-  }, [activeWorkers.length, phase, workers.length])
+  }, [activeWorkers.length, phase, workers])
 
   useEffect(() => {
     const keysToFetch = workers
@@ -379,6 +401,7 @@ export function useConductorGateway() {
       doneRef.current = false
       setGoal(trimmed)
       setStreamText('')
+      setPlanText('')
       setStreamEvents([])
       setStreamError(null)
       setCompletedAt(null)
@@ -386,6 +409,7 @@ export function useConductorGateway() {
       setMissionWorkerLabels(new Set())
       setWorkerOutputs({})
       fetchedWorkerOutputsRef.current = new Set()
+      seenToolCallRef.current = false
       setMissionStartedAt(new Date().toISOString())
       setPhase('decomposing')
 
@@ -403,6 +427,10 @@ export function useConductorGateway() {
         if (event.type === 'assistant' || event.type === 'thinking') {
           setStreamText((current) => current + event.text)
 
+          if (event.type === 'assistant' && !seenToolCallRef.current) {
+            setPlanText((current) => current + event.text)
+          }
+
           const labels = extractWorkerLabels(event.text)
           if (labels.length > 0) {
             setMissionWorkerLabels((current) => {
@@ -417,6 +445,9 @@ export function useConductorGateway() {
               return changed ? next : current
             })
           }
+        }
+        if (event.type === 'tool') {
+          seenToolCallRef.current = true
         }
         if (event.type === 'tool' && event.name === 'sessions_spawn' && event.phase === 'result') {
           const childSessionKey = readString(event.data?.childSessionKey)
@@ -454,6 +485,7 @@ export function useConductorGateway() {
     setPhase('idle')
     setGoal('')
     setStreamText('')
+    setPlanText('')
     setStreamEvents([])
     setStreamError(null)
     setMissionStartedAt(null)
@@ -462,12 +494,14 @@ export function useConductorGateway() {
     setMissionWorkerLabels(new Set())
     setWorkerOutputs({})
     fetchedWorkerOutputsRef.current = new Set()
+    seenToolCallRef.current = false
   }
 
   return {
     phase,
     goal,
     streamText,
+    planText,
     streamEvents,
     streamError,
     missionStartedAt,

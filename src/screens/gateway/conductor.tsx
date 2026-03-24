@@ -74,6 +74,16 @@ const QUICK_ACTIONS: Array<{
   },
 ]
 
+const AGENT_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift', 'Flux', 'Volt']
+const AGENT_EMOJIS = ['🤖', '⚡', '🔥', '🌊', '🌿', '💫', '🔮', '⭐']
+
+function getAgentPersona(index: number) {
+  return {
+    name: AGENT_NAMES[index % AGENT_NAMES.length],
+    emoji: AGENT_EMOJIS[index % AGENT_EMOJIS.length],
+  }
+}
+
 function formatElapsedTime(startIso: string | null | undefined, now: number): string {
   if (!startIso) return '0s'
   const startMs = new Date(startIso).getTime()
@@ -153,6 +163,24 @@ function extractProjectPath(text: string): string | null {
   return null
 }
 
+function getFilteredPlanText(planText: string, workerCount: number): string {
+  const filtered = planText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !line.includes('spawned') &&
+        !line.includes('Check the Conductor') &&
+        !line.includes('Waiting for it to finish'),
+    )
+    .join('\n')
+    .trim()
+
+  if (filtered) return filtered
+  return `Mission dispatched. ${workerCount} worker${workerCount === 1 ? '' : 's'} spawned.`
+}
+
 export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
@@ -198,6 +226,7 @@ export function Conductor() {
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
   const shouldCollapseLivePlanByDefault = totalWorkers > 0
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
+  const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
 
   const workerHistoryQuery = useQuery({
     queryKey: ['conductor', 'worker-history', selectedWorkerKey],
@@ -448,47 +477,21 @@ export function Conductor() {
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                {conductor.workers.map((worker) => {
+                {conductor.workers.map((worker, index) => {
                   const dot = getWorkerDot(worker.status)
+                  const persona = getAgentPersona(index)
+                  const shortModelName = getShortModelName(worker.model)
                   return (
-                    <div
-                      key={worker.key}
-                      className={cn(
-                        'rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3',
-                        getWorkerBorderClass(worker.status),
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={cn('size-2.5 rounded-full', dot.dotClass)} />
-                            <p className="truncate text-sm font-medium text-[var(--theme-text)]">{worker.label}</p>
-                          </div>
-                          <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{worker.displayName}</p>
-                        </div>
-                        <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                          {dot.label}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                          <p className="text-[var(--theme-muted)]">Model</p>
-                          <p className="mt-1 truncate text-[var(--theme-text)]">{getShortModelName(worker.model)}</p>
-                        </div>
-                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                          <p className="text-[var(--theme-muted)]">Tokens</p>
-                          <p className="mt-1 text-[var(--theme-text)]">{worker.tokenUsageLabel}</p>
-                        </div>
-                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                          <p className="text-[var(--theme-muted)]">Elapsed</p>
-                          <p className="mt-1 text-[var(--theme-text)]">{formatElapsedTime(conductor.missionStartedAt, now)}</p>
-                        </div>
-                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                          <p className="text-[var(--theme-muted)]">Last update</p>
-                          <p className="mt-1 text-[var(--theme-text)]">{formatRelativeTime(worker.updatedAt, now)}</p>
-                        </div>
-                      </div>
+                    <div key={worker.key} className="flex flex-wrap items-center gap-3 rounded-xl border-l-2 border-l-emerald-400 bg-[var(--theme-card)] px-4 py-3">
+                      <span className={cn('size-2 rounded-full', dot.dotClass.replace(' animate-pulse', ''))} />
+                      <span className="text-sm font-medium text-[var(--theme-text)]">
+                        {persona.emoji} {persona.name}
+                      </span>
+                      <span className="truncate text-xs text-[var(--theme-muted)]">· {worker.label}</span>
+                      <span className="text-xs text-[var(--theme-muted)]">·</span>
+                      <span className="text-xs text-[var(--theme-muted)]">{shortModelName}</span>
+                      <span className="text-xs text-[var(--theme-muted)]">·</span>
+                      <span className="text-xs text-[var(--theme-muted)]">{worker.totalTokens.toLocaleString()} tok</span>
                     </div>
                   )
                 })}
@@ -550,8 +553,8 @@ export function Conductor() {
               </span>
             </summary>
             <div className="mt-4 min-h-[220px] rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-              {conductor.streamText ? (
-                <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
+              {livePlanText ? (
+                <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{livePlanText}</Markdown>
               ) : (
                 <p className="text-sm text-[var(--theme-muted)]">Waiting for the first streamed response…</p>
               )}
@@ -564,8 +567,9 @@ export function Conductor() {
               <span className="text-xs text-[var(--theme-muted-2)]">Polling /api/sessions every 3s</span>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {conductor.workers.map((worker) => {
+              {conductor.workers.map((worker, index) => {
                 const dot = getWorkerDot(worker.status)
+                const persona = getAgentPersona(index)
                 const isSelected = selectedWorkerKey === worker.key
                 const workerOutput = isSelected ? selectedWorkerOutput : ''
                 return (
@@ -583,7 +587,9 @@ export function Conductor() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={cn('size-2.5 rounded-full', dot.dotClass)} />
-                          <p className="truncate text-sm font-medium text-[var(--theme-text)]">{worker.label}</p>
+                          <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                            {persona.emoji} {persona.name} <span className="text-[var(--theme-muted)]">·</span> {worker.label}
+                          </p>
                         </div>
                         <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{worker.displayName}</p>
                       </div>
