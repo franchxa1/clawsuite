@@ -233,6 +233,14 @@ function extractProjectPath(text: string): string | null {
     const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
     if (normalized.startsWith('/tmp/dispatch-')) return normalized
   }
+
+  const tmpMatches = text.match(/\/tmp\/[a-zA-Z0-9][^\s"')`\]>]+/g) ?? []
+  for (const raw of tmpMatches) {
+    const cleaned = raw.replace(/[.,;:!?\-`]+$/, '')
+    const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
+    if (normalized.length > 5) return normalized
+  }
+
   return null
 }
 

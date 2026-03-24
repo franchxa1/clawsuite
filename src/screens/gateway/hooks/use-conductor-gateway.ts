@@ -722,10 +722,10 @@ export function useConductorGateway() {
 
       await readSseStream(response, (event) => {
         setStreamEvents((current) => [...current, event])
-        if (event.type === 'assistant' || event.type === 'thinking') {
+        if (event.type === 'assistant') {
           setStreamText((current) => current + event.text)
 
-          if (event.type === 'assistant' && !seenToolCallRef.current) {
+          if (!seenToolCallRef.current) {
             setPlanText((current) => current + event.text)
           }
 
