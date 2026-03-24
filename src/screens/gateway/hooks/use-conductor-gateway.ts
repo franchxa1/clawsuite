@@ -326,7 +326,7 @@ export function useConductorGateway() {
           const updatedB = new Date(toIso(b.updatedAt ?? b.startedAt ?? b.createdAt) ?? 0).getTime()
           return updatedB - updatedA
         })
-        .slice(0, 10)
+        .slice(0, 20)
     },
     enabled: phase === 'idle',
     refetchInterval: false,
