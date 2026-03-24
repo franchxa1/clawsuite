@@ -13,7 +13,7 @@ const CONTENT_TYPES: Record<string, string> = {
 
 function isAllowedPreviewPath(filePath: string): boolean {
   const normalized = normalize(filePath)
-  return normalized === '/tmp/dispatch-' || normalized.startsWith('/tmp/dispatch-')
+  return normalized.startsWith('/tmp/')
 }
 
 export const Route = createFileRoute('/api/preview-file')({

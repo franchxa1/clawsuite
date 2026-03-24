@@ -27,6 +27,7 @@ type PersistedMission = {
   missionStartedAt: string | null
   workerKeys: string[]
   workerLabels: string[]
+  workerOutputs: Record<string, string>
   streamText: string
   planText: string
   completedAt: string | null
@@ -143,6 +144,14 @@ function loadPersistedMission(): PersistedMission | null {
     const planText = typeof parsed.planText === 'string' ? parsed.planText : null
     const workerKeys = Array.isArray(parsed.workerKeys) ? parsed.workerKeys.filter((value): value is string => typeof value === 'string') : null
     const workerLabels = Array.isArray(parsed.workerLabels) ? parsed.workerLabels.filter((value): value is string => typeof value === 'string') : null
+    const workerOutputs =
+      parsed.workerOutputs && typeof parsed.workerOutputs === 'object' && !Array.isArray(parsed.workerOutputs)
+        ? Object.fromEntries(
+            Object.entries(parsed.workerOutputs as Record<string, unknown>).filter(
+              (entry): entry is [string, string] => typeof entry[0] === 'string' && typeof entry[1] === 'string',
+            ),
+          )
+        : {}
     const missionStartedAt =
       parsed.missionStartedAt === null || parsed.missionStartedAt === undefined ? null : toIso(parsed.missionStartedAt)
     const completedAt = parsed.completedAt === null || parsed.completedAt === undefined ? null : toIso(parsed.completedAt)
@@ -190,6 +199,7 @@ function loadPersistedMission(): PersistedMission | null {
       missionStartedAt,
       workerKeys,
       workerLabels,
+      workerOutputs,
       streamText,
       planText,
       completedAt,
@@ -439,7 +449,7 @@ export function useConductorGateway() {
   const [timeoutWarning, setTimeoutWarning] = useState(false)
   const [missionWorkerKeys, setMissionWorkerKeys] = useState<Set<string>>(() => new Set(initialMission?.workerKeys ?? []))
   const [missionWorkerLabels, setMissionWorkerLabels] = useState<Set<string>>(() => new Set(initialMission?.workerLabels ?? []))
-  const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>({})
+  const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>(() => initialMission?.workerOutputs ?? {})
   const [tasks, setTasks] = useState<ConductorTask[]>(() => initialMission?.tasks ?? [])
   const [missionHistory, setMissionHistory] = useState<MissionHistoryEntry[]>(() => loadMissionHistory())
   const doneRef = useRef(initialMission?.phase === 'complete')
@@ -695,12 +705,13 @@ export function useConductorGateway() {
       missionStartedAt,
       workerKeys: [...missionWorkerKeys],
       workerLabels: [...missionWorkerLabels],
+      workerOutputs,
       streamText: streamText.slice(0, 10_000),
       planText: planText.slice(0, 10_000),
       completedAt,
       tasks,
     })
-  }, [phase, goal, missionStartedAt, completedAt, missionWorkerKeys, missionWorkerLabels, streamText, planText, tasks])
+  }, [phase, goal, missionStartedAt, completedAt, missionWorkerKeys, missionWorkerLabels, workerOutputs, streamText, planText, tasks])
 
   const sendMission = useMutation({
     mutationFn: async (nextGoal: string) => {

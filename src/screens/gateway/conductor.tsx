@@ -312,27 +312,28 @@ export function Conductor() {
   const completedWorkers = conductor.workers.filter((worker) => worker.status === 'complete').length
   const activeWorkerCount = conductor.activeWorkers.length
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
-  const shouldCollapseLivePlanByDefault = false
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
   const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
 
   const completePhaseProjectPath = useMemo(() => {
+    const workerOutputTexts = [
+      ...Object.values(conductor.workerOutputs),
+      ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
+    ].filter(Boolean)
+
+    for (const text of workerOutputTexts) {
+      const extractedPath = extractProjectPath(text)
+      if (extractedPath) return extractedPath
+    }
+
     for (const task of conductor.tasks) {
       if (!task.output) continue
       const extractedPath = extractProjectPath(task.output)
       if (extractedPath) return extractedPath
     }
 
-    const workerOutput = [
-      ...Object.values(conductor.workerOutputs),
-      ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
-    ]
-      .filter(Boolean)
-      .join('\n')
-
-    const combinedText = `${conductor.streamText}\n${workerOutput}`
-    const extractedPath = extractProjectPath(combinedText)
-    if (extractedPath) return extractedPath
+    const streamPath = extractProjectPath(conductor.streamText)
+    if (streamPath) return streamPath
 
     const candidates = buildProjectPathCandidates(conductor.workers, conductor.missionStartedAt)
     return candidates[0] ?? null
@@ -664,8 +665,8 @@ export function Conductor() {
 
   if (phase === 'complete') {
     return (
-      <div className="min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex max-w-[960px] flex-col px-6 py-12 pb-24">
+      <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto min-h-0 w-full max-w-[720px] flex-1 overflow-y-auto px-6 py-8">
           <div className="space-y-6">
             {conductor.streamError && (
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-3">
@@ -834,9 +835,9 @@ export function Conductor() {
   }
 
   return (
-    <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <main className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto flex w-full max-w-[960px] flex-col gap-6">
+    <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+      <main className="mx-auto min-h-0 w-full max-w-[720px] flex-1 overflow-y-auto px-6 py-8">
+        <div className="flex w-full flex-col gap-6">
           <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]/70 px-5 py-4 sm:px-6">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
               <div className="min-w-0 text-center">
@@ -890,27 +891,17 @@ export function Conductor() {
               </div>
             </div>
           )}
-          <details
-            className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6"
-            open={!shouldCollapseLivePlanByDefault}
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:hidden">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Live Plan</p>
-                <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Streaming decomposition from the main gateway chat session.</p>
+          {livePlanText && (
+            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Status</p>
+                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
+                  Running
+                </span>
               </div>
-              <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
-                Running
-              </span>
-            </summary>
-            <div className="mt-4 min-h-[220px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-              {livePlanText ? (
-                <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{livePlanText}</Markdown>
-              ) : (
-                <PlanningIndicator />
-              )}
+              <p className="mt-2 text-sm text-[var(--theme-muted-2)] line-clamp-3">{livePlanText.slice(0, 300)}</p>
             </div>
-          </details>
+          )}
 
           {conductor.tasks.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
