@@ -266,7 +266,6 @@ export function useConductorGateway() {
   const [missionWorkerKeys, setMissionWorkerKeys] = useState<Set<string>>(new Set())
   const [missionWorkerLabels, setMissionWorkerLabels] = useState<Set<string>>(new Set())
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>({})
-  const fetchedWorkerOutputsRef = useRef<Set<string>>(new Set())
   const doneRef = useRef(false)
   const seenToolCallRef = useRef(false)
 
@@ -382,40 +381,42 @@ export function useConductorGateway() {
   }, [activeWorkers.length, phase, workers])
 
   useEffect(() => {
-    const keysToFetch = workers
-      .filter((worker) => {
-        if (fetchedWorkerOutputsRef.current.has(worker.key)) return false
-        return phase === 'complete' || worker.status === 'complete'
-      })
-      .map((worker) => worker.key)
-
-    if (keysToFetch.length === 0) return
+    if (workers.length === 0) return
 
     let cancelled = false
 
-    for (const key of keysToFetch) {
-      fetchedWorkerOutputsRef.current.add(key)
+    const fetchAll = async () => {
+      for (const worker of workers) {
+        if (worker.totalTokens <= 0) continue
+        try {
+          const output = await fetchWorkerOutput(worker.key, 5)
+          if (cancelled || !output) continue
+          setWorkerOutputs((current) => {
+            if (current[worker.key] === output) return current
+            return { ...current, [worker.key]: output }
+          })
+        } catch {
+          // Ignore transient history fetch errors and retry on the next poll.
+        }
+      }
     }
 
-    void Promise.allSettled(
-      keysToFetch.map(async (key) => {
-        const output = await fetchWorkerOutput(key, 5)
-        if (cancelled) return
-        setWorkerOutputs((current) => {
-          if (current[key] === output) return current
-          return { ...current, [key]: output }
-        })
-      }),
-    ).then((results) => {
-      if (cancelled) return
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') return
-        fetchedWorkerOutputsRef.current.delete(keysToFetch[index])
-      })
-    })
+    void fetchAll()
+
+    const hasRunningWorkers = workers.some((worker) => worker.status === 'running' || worker.status === 'idle')
+    if (!hasRunningWorkers) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const timer = window.setInterval(() => {
+      void fetchAll()
+    }, 5_000)
 
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [phase, workers])
 
@@ -433,7 +434,6 @@ export function useConductorGateway() {
       setMissionWorkerKeys(new Set())
       setMissionWorkerLabels(new Set())
       setWorkerOutputs({})
-      fetchedWorkerOutputsRef.current = new Set()
       seenToolCallRef.current = false
       setMissionStartedAt(new Date().toISOString())
       setPhase('decomposing')
@@ -518,7 +518,6 @@ export function useConductorGateway() {
     setMissionWorkerKeys(new Set())
     setMissionWorkerLabels(new Set())
     setWorkerOutputs({})
-    fetchedWorkerOutputsRef.current = new Set()
     seenToolCallRef.current = false
   }
 

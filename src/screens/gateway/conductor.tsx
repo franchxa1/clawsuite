@@ -79,6 +79,52 @@ function getAgentPersona(index: number) {
   }
 }
 
+function PlanningIndicator() {
+  const [step, setStep] = useState(0)
+  const steps = ['Planning the mission…', 'Analyzing requirements…', 'Preparing agents…', 'Writing the spec…']
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setStep((current) => (current + 1) % steps.length), 2_500)
+    return () => window.clearInterval(timer)
+  }, [steps.length])
+
+  return (
+    <div className="flex items-center gap-3 py-4">
+      <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-accent)] border-t-transparent" />
+      <p className="animate-pulse text-sm text-[var(--theme-muted)]">{steps[step]}</p>
+    </div>
+  )
+}
+
+function formatMissionTimestamp(value: string | null | undefined): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return null
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+}
+
+function buildProjectPathCandidates(workers: Array<{ label: string }>, missionStartedAt: string | null | undefined): string[] {
+  const timestamp = formatMissionTimestamp(missionStartedAt)
+  const candidates = new Set<string>()
+
+  for (const worker of workers) {
+    const label = worker.label ?? ''
+    const slug = label.replace(/^worker-/, '').trim()
+    if (!slug) continue
+
+    candidates.add(`/tmp/dispatch-${slug}`)
+    candidates.add(`/tmp/dispatch-${slug}-page`)
+
+    if (timestamp) {
+      candidates.add(`/tmp/dispatch-${slug}-${timestamp}`)
+      candidates.add(`/tmp/dispatch-${slug}-${timestamp}-page`)
+    }
+  }
+
+  return [...candidates]
+}
+
 function formatElapsedTime(startIso: string | null | undefined, now: number): string {
   if (!startIso) return '0s'
   const startMs = new Date(startIso).getTime()
@@ -234,8 +280,13 @@ export function Conductor() {
       .filter(Boolean)
       .join('\n')
 
-    return extractProjectPath(`${conductor.streamText}\n${workerOutput}`)
-  }, [conductor.streamText, conductor.workerOutputs, conductor.workers])
+    const combinedText = `${conductor.streamText}\n${workerOutput}`
+    const extractedPath = extractProjectPath(combinedText)
+    if (extractedPath) return extractedPath
+
+    const candidates = buildProjectPathCandidates(conductor.workers, conductor.missionStartedAt)
+    return candidates[0] ?? null
+  }, [conductor.streamText, conductor.workerOutputs, conductor.workers, conductor.missionStartedAt])
 
   const completeSummary = useMemo(() => {
     if (phase !== 'complete') return null
@@ -292,7 +343,7 @@ export function Conductor() {
                 What should the team do next?
               </h1>
               <p className="text-sm text-[var(--theme-muted-2)]">
-                Describe the mission. Aurora will decompose it in chat, then the worker sessions will appear here live.
+                Describe the mission. The agent will decompose it in chat, then the worker sessions will appear here live.
               </p>
             </div>
 
@@ -451,7 +502,7 @@ export function Conductor() {
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
               <h1 className="text-2xl font-semibold tracking-tight">{conductor.goal}</h1>
               <p className="text-sm text-[var(--theme-muted-2)]">
-                Aurora is breaking the mission into workers. Once they spawn, this view flips into the active board.
+                The agent is breaking the mission into workers. Once they spawn, this view flips into the active board.
               </p>
             </div>
 
@@ -471,10 +522,7 @@ export function Conductor() {
                     {conductor.streamText}
                   </Markdown>
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-3 py-8">
-                    <div className="size-6 animate-spin rounded-full border-2 border-[var(--theme-accent)] border-t-transparent" />
-                    <p className="text-sm text-[var(--theme-muted)]">Aurora is planning the mission…</p>
-                  </div>
+                  <PlanningIndicator />
                 )}
               </div>
               {conductor.streamError && (
@@ -630,7 +678,7 @@ export function Conductor() {
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:hidden">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Aurora Live Plan</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Live Plan</p>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Streaming decomposition from the main gateway chat session.</p>
               </div>
               <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
@@ -641,10 +689,7 @@ export function Conductor() {
               {livePlanText ? (
                 <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{livePlanText}</Markdown>
               ) : (
-                <div className="flex items-center gap-3 py-4">
-                  <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-accent)] border-t-transparent" />
-                  <p className="text-sm text-[var(--theme-muted)]">Aurora is orchestrating the mission…</p>
-                </div>
+                <PlanningIndicator />
               )}
             </div>
           </details>
