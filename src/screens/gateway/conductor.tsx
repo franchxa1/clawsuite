@@ -79,21 +79,37 @@ function getAgentPersona(index: number) {
   }
 }
 
-function PlanningIndicator() {
+const PLANNING_STEPS = ['Planning the mission…', 'Analyzing requirements…', 'Preparing agents…', 'Writing the spec…']
+const WORKING_STEPS = [
+  '📋 Reviewing the brief…',
+  '🔍 Scanning existing patterns…',
+  '✏️ Drafting the implementation…',
+  '☕ Grabbing a coffee…',
+  '🧠 Thinking through edge cases…',
+  '🎨 Polishing the design…',
+  '🔧 Wiring up components…',
+  '📐 Checking the layout…',
+  '🚀 Almost there…',
+]
+
+function CyclingStatus({ steps, intervalMs = 3000 }: { steps: string[]; intervalMs?: number }) {
   const [step, setStep] = useState(0)
-  const steps = ['Planning the mission…', 'Analyzing requirements…', 'Preparing agents…', 'Writing the spec…']
 
   useEffect(() => {
-    const timer = window.setInterval(() => setStep((current) => (current + 1) % steps.length), 2_500)
+    const timer = window.setInterval(() => setStep((current) => (current + 1) % steps.length), intervalMs)
     return () => window.clearInterval(timer)
-  }, [steps.length])
+  }, [steps.length, intervalMs])
 
   return (
-    <div className="flex items-center gap-3 py-4">
-      <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-accent)] border-t-transparent" />
-      <p className="animate-pulse text-sm text-[var(--theme-muted)]">{steps[step]}</p>
+    <div className="flex items-center gap-3 py-3">
+      <div className="size-3.5 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+      <p className="text-sm text-[var(--theme-muted)] transition-opacity duration-500">{steps[step]}</p>
     </div>
   )
+}
+
+function PlanningIndicator() {
+  return <CyclingStatus steps={PLANNING_STEPS} intervalMs={2500} />
 }
 
 function formatMissionTimestamp(value: string | null | undefined): string | null {
@@ -750,7 +766,7 @@ export function Conductor() {
                       {workerOutput ? (
                         <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
                       ) : (
-                        <p className="text-sm text-[var(--theme-muted)]">No assistant output yet.</p>
+                        <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} />
                       )}
                     </div>
                   </div>
