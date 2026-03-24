@@ -19,6 +19,8 @@ const STATE_PATH = join(
 );
 
 function buildOrchestratorMessage(missionId: string, mission: string, tasks: any[], projectPath: string, daemonMissionId: string | null): string {
+  const daemonPort = Number(process.env.PORT ?? 3099);
+  const daemonUrl = `http://localhost:${daemonPort}`;
   const taskLines = tasks.map((t: any, i: number) => {
     const dbId = t.dbId || t.id || `task-${String(i + 1).padStart(3, "0")}`;
     const title = t.title || t.name || "Task";
@@ -42,7 +44,7 @@ ${taskLines}
 ## Execution — for EACH task in order:
 
 1. Mark task running:
-   curl -s -X PATCH http://localhost:3002/api/workspace/tasks/<DB_ID> -H 'Content-Type: application/json' -d '{"status":"running"}'
+   curl -s -X PATCH ${daemonUrl}/api/workspace/tasks/<DB_ID> -H 'Content-Type: application/json' -d '{"status":"running"}'
 
 2. Spawn a worker using sessions_spawn:
    - task: clear build instructions (include project path + expected output file)
@@ -57,12 +59,12 @@ ${taskLines}
 4. Verify output exists (use exec to check files).
 
 5. Mark task completed:
-   curl -s -X PATCH http://localhost:3002/api/workspace/tasks/<DB_ID> -H 'Content-Type: application/json' -d '{"status":"completed"}'
+   curl -s -X PATCH ${daemonUrl}/api/workspace/tasks/<DB_ID> -H 'Content-Type: application/json' -d '{"status":"completed"}'
 
 6. Continue to next task.
 
 ## After ALL tasks:
-curl -s -X PATCH http://localhost:3002/api/workspace/missions/${missionPatchId}/status -H 'Content-Type: application/json' -d '{"status":"completed"}'
+curl -s -X PATCH ${daemonUrl}/api/workspace/missions/${missionPatchId}/status -H 'Content-Type: application/json' -d '{"status":"completed"}'
 
 ## Rules
 - Execute autonomously. Do NOT ask for user input.
@@ -79,17 +81,22 @@ function fireDispatchTrigger(missionId: string, mission: string, tasks: any[] = 
 }
 
 function fireWakeFallback(gatewayUrl: string, missionId: string, message: string): void {
-  fetch(`${gatewayUrl}/api/cron/wake`, {
+  const hooksToken = process.env.OPENCLAW_HOOKS_TOKEN ?? "";
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (hooksToken) {
+    headers["Authorization"] = `Bearer ${hooksToken}`;
+  }
+  fetch(`${gatewayUrl}/hooks`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: message, mode: "now" }),
+    headers,
+    body: JSON.stringify({ text: message }),
   })
     .then((res) => {
-      if (res.ok) console.log("[dispatch] Wake sent for", missionId);
-      else console.error("[dispatch] Wake returned", res.status);
+      if (res.ok) console.log("[dispatch] Hook sent for", missionId);
+      else console.error("[dispatch] Hook returned", res.status);
     })
     .catch((err: Error) => {
-      console.error("[dispatch] Wake failed:", err.message);
+      console.error("[dispatch] Hook failed:", err.message);
     });
 }
 
