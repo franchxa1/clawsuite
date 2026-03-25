@@ -761,6 +761,7 @@ export function useConductorGateway() {
 
     // Transition to complete with error instead of clearing — so it shows as failed in activity
     setStreamError('Mission stopped by user')
+    setCompletedAt(new Date().toISOString())
     setPhase('complete')
   }
 
