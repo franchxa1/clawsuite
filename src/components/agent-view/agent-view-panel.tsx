@@ -957,7 +957,7 @@ export function AgentViewPanel() {
                               statusCounts.thinking === 0 &&
                               statusCounts.failed === 0 &&
                               statusCounts.complete === 0
-                            ? 'Waiting for agents'
+                            ? ''
                             : [
                                 statusCounts.running > 0 &&
                                   `${statusCounts.running} running`,
@@ -1153,8 +1153,8 @@ export function AgentViewPanel() {
                         }
                         className="text-[11px] text-pretty text-primary-600 py-1"
                       >
-                        No active agents. Launch a mission from Conductor to see
-                        them here.
+
+
                       </p>
                     )}
                   </LayoutGroup>
@@ -1344,7 +1344,7 @@ export function AgentViewPanel() {
                         {isLoading
                           ? 'syncing...'
                           : activeNodes.length === 0 && queuedNodes.length === 0
-                            ? 'Waiting for agents'
+                            ? ''
                             : `${activeNodes.length} active · ${queuedNodes.length} queued`}
                       </p>
                     </div>
