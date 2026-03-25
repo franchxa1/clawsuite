@@ -53,6 +53,31 @@ function buildOrchestratorPrompt(goal: string, skill: string): string {
   ].join('\n')
 }
 
+async function cronRpcWithFallback<T>(params: unknown): Promise<T> {
+  const methods = ['cron.add', 'cron.jobs.add', 'scheduler.jobs.add']
+  let lastError: unknown = null
+  for (const method of methods) {
+    try {
+      return await gatewayRpc<T>(method, params)
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('cron add failed')
+}
+
+async function cronRunWithFallback(jobId: string): Promise<void> {
+  const methods = ['cron.run', 'cron.jobs.run', 'scheduler.jobs.run']
+  for (const method of methods) {
+    try {
+      await gatewayRpc(method, { jobId, runMode: 'force' })
+      return
+    } catch {
+      continue
+    }
+  }
+}
+
 export const Route = createFileRoute('/api/conductor-spawn')({
   server: {
     handlers: {
@@ -74,15 +99,13 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           const skill = loadDispatchSkill()
           const prompt = buildOrchestratorPrompt(goal, skill)
 
-          // Use cron.add with an immediate "at" schedule to spawn a trusted isolated agentTurn
-          // This creates a proper session that can use sessions_spawn, exec, etc.
-          const now = new Date()
+          // Use cron to spawn a trusted isolated agentTurn session
           const jobName = `conductor-${Date.now()}`
 
-          const addResult = await gatewayRpc<{ ok: boolean; jobId?: string; error?: string }>('cron.add', {
+          const addResult = await cronRpcWithFallback<{ ok?: boolean; jobId?: string; id?: string; error?: string }>({
             job: {
               name: jobName,
-              schedule: { kind: 'at', at: now.toISOString() },
+              schedule: { kind: 'at', at: new Date().toISOString() },
               payload: {
                 kind: 'agentTurn',
                 message: prompt,
@@ -93,15 +116,10 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             },
           })
 
-          if (!addResult.ok) {
-            return json({ ok: false, error: (addResult as { error?: string }).error ?? 'Failed to create cron job' }, { status: 500 })
-          }
+          const jobId = addResult.jobId ?? addResult.id ?? jobName
 
-          // Force-run it immediately
-          const jobId = addResult.jobId ?? jobName
-          await gatewayRpc('cron.run', { jobId, runMode: 'force' }).catch(() => {
-            // Job may already be running from the "at" schedule
-          })
+          // Force-run immediately in case the "at" schedule hasn't fired yet
+          await cronRunWithFallback(jobId).catch(() => {})
 
           return json({
             ok: true,
