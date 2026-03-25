@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   ArrowDown01Icon,
   ArrowExpand01Icon,
@@ -608,7 +609,7 @@ export function AgentViewPanel() {
     cancelQueueTask,
     activeCount,
   } = useAgentView()
-
+  const navigate = useNavigate()
 
   // Transcript modal removed — View button now navigates to /agent-swarm
   const [selectedAgentChat, setSelectedAgentChat] = useState<{
@@ -895,8 +896,10 @@ export function AgentViewPanel() {
                   size="icon-sm"
                   variant="ghost"
                   onClick={function handleExpandHub() {
-                    setOpen(false)
-                    window.location.assign('/conductor')
+                    navigate({ to: '/conductor' })
+                    setTimeout(() => {
+                      setOpen(false)
+                    }, 0)
                   }}
                   aria-label="Open Conductor"
                   title="Open Conductor"
