@@ -771,8 +771,6 @@ function deriveSessionStatus(session: GatewaySession): 'running' | 'completed' |
   return 'running'
 }
 
-const ACTIVITY_PAGE_SIZE = 3
-
 export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
@@ -781,7 +779,6 @@ export function Conductor() {
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'failed'>('all')
-  const [activityPage, setActivityPage] = useState(0)
   const [completeCostExpanded, setCompleteCostExpanded] = useState(true)
   const [historyCostExpanded, setHistoryCostExpanded] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -879,7 +876,6 @@ export function Conductor() {
     setContinueDraft('')
     setContinueModalOpen(false)
     setSelectedTaskId(null)
-    setActivityPage(0)
   }
 
   const handleSubmit = async () => {
@@ -1160,20 +1156,7 @@ export function Conductor() {
       .filter((session) => deriveSessionStatus(session as GatewaySession) === activityFilter)
   })()
   const activityItems: Array<MissionHistoryEntry | GatewaySession> = hasMissionHistory ? filteredHistory : filteredSessions
-  const totalPages = Math.max(1, Math.ceil(activityItems.length / ACTIVITY_PAGE_SIZE))
-  const safeActivityPage = Math.min(activityPage, totalPages - 1)
-  const pageItems = activityItems.slice(
-    safeActivityPage * ACTIVITY_PAGE_SIZE,
-    (safeActivityPage + 1) * ACTIVITY_PAGE_SIZE,
-  )
-  const canPrev = safeActivityPage > 0
-  const canNext = safeActivityPage < totalPages - 1
-
-  useEffect(() => {
-    if (activityPage !== safeActivityPage) {
-      setActivityPage(safeActivityPage)
-    }
-  }, [activityPage, safeActivityPage])
+  const visibleActivityItems = activityItems.slice(0, 5)
 
   useEffect(() => {
     if (!selectedTaskId) return
@@ -1365,9 +1348,9 @@ export function Conductor() {
 
     return (
       <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
-          <div className="w-full space-y-8">
-            <div className="space-y-3">
+        <main className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col items-stretch px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-6">
+          <div className="w-full space-y-4">
+            <div className="space-y-2">
               <div className="relative flex items-center justify-center">
                 <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
                   Conductor
@@ -1382,22 +1365,25 @@ export function Conductor() {
                   <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.7} />
                 </button>
               </div>
-              <h1 className="text-center text-2xl font-semibold tracking-tight text-[var(--theme-text)] md:text-4xl">
-                What should the team do next?
-              </h1>
-              <p className="text-center text-sm text-[var(--theme-muted-2)]">
-                Describe the mission. The agent will decompose it in chat, then the worker sessions will appear here live.
+              <p className="text-center text-xs text-[var(--theme-muted-2)] md:text-sm">
+                Describe a mission for your agent team.
               </p>
             </div>
 
-            <section className="w-full overflow-hidden rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
-              <textarea
-                value={goalDraft}
-                onChange={(e) => setGoalDraft(e.target.value)}
-                placeholder="Describe the mission, constraints, and desired outcome."
-                className="min-h-[180px] w-full resize-none bg-[var(--theme-card)] px-6 py-5 text-base text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted-2)]"
+            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]" style={{ height: 340 }}>
+              <OfficeView
+                agentRows={homeOfficeRows}
+                missionRunning={homeOfficeRows.some((a) => a.status === 'active')}
+                onViewOutput={() => {}}
+                processType="parallel"
+                companyName="Agent Office"
+                containerHeight={340}
+                hideHeader
               />
-              <div className="flex flex-col gap-3 border-t border-[var(--theme-border)] px-4 py-4 md:flex-row md:items-center md:justify-between">
+            </section>
+
+            <section className="w-full rounded-[28px] border border-[var(--theme-border2)] bg-[var(--theme-card)] p-4 shadow-[0_24px_80px_var(--theme-shadow)]">
+              <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {QUICK_ACTIONS.map((action) => (
                     <button
@@ -1407,15 +1393,16 @@ export function Conductor() {
                         setSelectedAction(action.id)
                         setGoalDraft((current) => {
                           const trimmed = current.trim()
-                          if (!trimmed) return action.prompt
+                          if (!trimmed) return `${action.label}: `
+                          if (trimmed.toLowerCase().startsWith(`${action.label.toLowerCase()}:`)) return current
                           return `${action.label}: ${trimmed}`
                         })
                       }}
                       className={cn(
                         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                         selectedAction === action.id
-                          ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft-strong)] text-[var(--theme-accent-strong)]'
-                          : 'border-[var(--theme-border2)] bg-[var(--theme-card)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]',
+                          ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                          : 'border-[var(--theme-border)] bg-transparent text-[var(--theme-muted)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]',
                       )}
                     >
                       <HugeiconsIcon icon={action.icon} size={14} strokeWidth={1.7} />
@@ -1423,58 +1410,42 @@ export function Conductor() {
                     </button>
                   ))}
                 </div>
-                <Button
-                  onClick={() => void handleSubmit()}
-                  disabled={!goalDraft.trim() || conductor.isSending}
-                  className="min-w-[140px] rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleSubmit()
+                  }}
+                  className="rounded-full border border-[var(--theme-border2)] bg-[var(--theme-bg)] p-1.5 shadow-[0_10px_30px_color-mix(in_srgb,var(--theme-shadow)_12%,transparent)]"
                 >
-                  {conductor.isSending ? 'Dispatching...' : 'Launch Mission'}
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
-                </Button>
+                  <div className="flex items-center gap-2">
+                    <span className="pl-3 text-[var(--theme-muted)]">
+                      <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.8} />
+                    </span>
+                    <input
+                      type="text"
+                      value={goalDraft}
+                      onChange={(event) => setGoalDraft(event.target.value)}
+                      placeholder={`${QUICK_ACTIONS.find((action) => action.id === selectedAction)?.label ?? 'Build'}: describe the mission, constraints, and desired outcome.`}
+                      className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted-2)] md:text-base"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={!goalDraft.trim() || conductor.isSending}
+                      className="rounded-full bg-[var(--theme-accent)] px-4 text-white hover:bg-[var(--theme-accent-strong)]"
+                    >
+                      {conductor.isSending ? 'Launching...' : 'Launch'}
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
+                    </Button>
+                  </div>
+                </form>
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm" style={{ height: 380 }}>
-              <OfficeView
-                agentRows={homeOfficeRows}
-                missionRunning={homeOfficeRows.some((a) => a.status === 'active')}
-                onViewOutput={() => {}}
-                processType="parallel"
-                companyName="Agent Office"
-                containerHeight={380}
-                hideHeader
-              />
-            </section>
-
             {(hasMissionHistory || conductor.recentSessions.length > 0) && (
-              <section className="w-full space-y-3">
+              <section className="w-full space-y-2">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Recent Activity</h2>
-                  <div className="ml-auto flex items-center gap-1">
-                    <span className="text-[10px] text-[var(--theme-muted-2)]">{safeActivityPage + 1}/{totalPages}</span>
-                    <button
-                      type="button"
-                      disabled={!canPrev}
-                      onClick={() => setActivityPage((page) => page - 1)}
-                      className={cn(
-                        'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
-                        canPrev ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
-                      )}
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canNext}
-                      onClick={() => setActivityPage((page) => page + 1)}
-                      className={cn(
-                        'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
-                        canNext ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
-                      )}
-                    >
-                      ›
-                    </button>
-                  </div>
+                  <span className="ml-auto text-[10px] text-[var(--theme-muted-2)]">Latest 5</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {(['all', 'completed', 'failed'] as const).map((filter) => (
@@ -1483,7 +1454,6 @@ export function Conductor() {
                       type="button"
                       onClick={() => {
                         setActivityFilter(filter)
-                        setActivityPage(0)
                       }}
                       className={cn(
                         'rounded-full border px-3 py-1 text-[11px] font-medium capitalize transition-colors',
@@ -1496,35 +1466,35 @@ export function Conductor() {
                     </button>
                   ))}
                 </div>
-                {pageItems.length > 0 ? (
+                {visibleActivityItems.length > 0 ? (
                   <div className="space-y-1.5">
                     {hasMissionHistory
-                      ? pageItems.map((item) => {
+                      ? visibleActivityItems.map((item) => {
                           const entry = item as MissionHistoryEntry
                           return (
                             <button
                               key={entry.id}
                               type="button"
                               onClick={() => conductor.setSelectedHistoryEntry(entry)}
-                              className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left text-sm transition-colors cursor-pointer hover:border-[var(--theme-border2)]"
+                              className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-left text-sm transition-colors hover:border-[var(--theme-accent)]"
                             >
+                              <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)]">{entry.goal}</span>
                               <span
-                                className={cn('size-2 rounded-full', entry.status === 'completed' ? 'bg-emerald-400' : 'bg-red-400')}
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate font-medium text-[var(--theme-text)]">{entry.goal}</span>
-                                <span className="mt-0.5 block text-xs text-[var(--theme-muted-2)]">
-                                  {formatDurationRange(entry.startedAt, entry.completedAt, now)} · {entry.workerCount} workers
-                                </span>
+                                className={cn(
+                                  'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em]',
+                                  entry.status === 'completed'
+                                    ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
+                                    : 'border-red-400/35 bg-red-500/10 text-red-300',
+                                )}
+                              >
+                                {entry.status === 'completed' ? 'Complete' : 'Failed'}
                               </span>
-                              <span className="hidden text-xs text-[var(--theme-muted)] sm:inline">{entry.totalTokens.toLocaleString()} tok</span>
-                              <span className="text-xs text-[var(--theme-muted-2)]">
-                                {formatRelativeTime(entry.completedAt, now)}
-                              </span>
+                              <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(entry.completedAt, now)}</span>
+                              <span className="shrink-0 text-xs text-[var(--theme-muted)]">{entry.totalTokens.toLocaleString()} tok</span>
                             </button>
                           )
                         })
-                      : pageItems.map((item) => {
+                      : visibleActivityItems.map((item) => {
                           const recentSession = item as GatewaySession
                           const label = recentSession.label ?? recentSession.key ?? ''
                           const displayName = label.replace(/^worker-/, '').replace(/[-_]+/g, ' ')
@@ -1549,14 +1519,25 @@ export function Conductor() {
                           return (
                             <div
                               key={recentSession.key}
-                              className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2.5 text-sm"
+                              className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm"
                             >
-                              <span className={cn('size-2 rounded-full', dotClass)} />
-                              <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)] capitalize">{displayName}</span>
-                              <span className="text-xs capitalize text-[var(--theme-muted)]">{sessionStatus}</span>
-                              <span className="text-xs text-[var(--theme-muted)]">{model}</span>
-                              <span className="text-xs text-[var(--theme-muted)]">{tokens.toLocaleString()} tok</span>
-                              <span className="text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(updatedAt, now)}</span>
+                              <span className="min-w-0 flex-1 truncate font-medium capitalize text-[var(--theme-text)]">{displayName}</span>
+                              <span
+                                className={cn(
+                                  'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em]',
+                                  sessionStatus === 'completed'
+                                    ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
+                                    : sessionStatus === 'failed'
+                                      ? 'border-red-400/35 bg-red-500/10 text-red-300'
+                                      : 'border-sky-400/35 bg-sky-500/10 text-sky-300',
+                                )}
+                              >
+                                <span className={cn('mr-1 inline-block size-1.5 rounded-full align-middle', dotClass)} />
+                                {sessionStatus}
+                              </span>
+                              <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(updatedAt, now)}</span>
+                              <span className="shrink-0 text-xs text-[var(--theme-muted)]">{tokens.toLocaleString()} tok</span>
+                              <span className="hidden shrink-0 text-xs text-[var(--theme-muted)] sm:inline">{model}</span>
                             </div>
                           )
                         })}
@@ -1674,7 +1655,6 @@ export function Conductor() {
                           setGoalDraft('')
                           setContinueDraft('')
                           setSelectedTaskId(null)
-                          setActivityPage(0)
                         }}
                         className="text-xs text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-accent)]"
                       >
