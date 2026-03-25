@@ -143,6 +143,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
                 kind: 'agentTurn',
                 message: prompt,
                 timeoutSeconds: 600,
+                ...(orchestratorModel ? { model: orchestratorModel } : {}),
               },
               sessionTarget: 'isolated',
               enabled: true,
