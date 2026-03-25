@@ -312,6 +312,28 @@ function loadMissionHistory(): MissionHistoryEntry[] {
         seen.add(e.id)
         return true
       })
+      .map((entry) => {
+        const projectPath =
+          (typeof entry.projectPath === 'string' && entry.projectPath.trim()) ||
+          extractProjectPath(typeof entry.projectPath === 'string' ? entry.projectPath : '') ||
+          null
+        const outputText = typeof entry.outputText === 'string' ? entry.outputText : undefined
+        const streamText = typeof entry.streamText === 'string' ? entry.streamText : undefined
+        const outputPath =
+          (typeof entry.outputPath === 'string' && entry.outputPath.trim()) ||
+          extractProjectPath(typeof entry.outputPath === 'string' ? entry.outputPath : '') ||
+          projectPath ||
+          extractProjectPath(outputText ?? '') ||
+          extractProjectPath(streamText ?? '') ||
+          null
+        return {
+          ...entry,
+          projectPath,
+          outputPath,
+          outputText,
+          streamText,
+        }
+      })
       .slice(0, MAX_HISTORY_ENTRIES)
   } catch {
     return []
@@ -1061,7 +1083,7 @@ export function useConductorGateway() {
     clearMissionState()
   }
 
-  const steerAgent = useMutation({
+  const sendSessionMessage = useMutation({
     mutationFn: async ({ sessionKey, message }: { sessionKey: string; message: string }) => {
       const trimmedSessionKey = sessionKey.trim()
       const trimmedMessage = message.trim()
@@ -1069,7 +1091,7 @@ export function useConductorGateway() {
       if (!trimmedSessionKey) throw new Error('Session key required')
       if (!trimmedMessage) throw new Error('Message required')
 
-      const response = await fetch('/api/agent-steer', {
+      const response = await fetch('/api/sessions/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1078,9 +1100,13 @@ export function useConductorGateway() {
         }),
       })
 
+      const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string }
       if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        throw new Error(text || `Steer request failed (${response.status})`)
+        throw new Error(payload.error || `Send request failed (${response.status})`)
+      }
+
+      if (payload.ok !== true) {
+        throw new Error(payload.error || 'Failed to send message to session')
       }
     },
   })
@@ -1158,6 +1184,12 @@ export function useConductorGateway() {
     missionStartedAt,
     isPaused,
     pausedElapsedMs,
+    pausedAtMs:
+      isPaused && pauseStartedAt
+        ? Number.isFinite(new Date(pauseStartedAt).getTime())
+          ? new Date(pauseStartedAt).getTime()
+          : null
+        : null,
     missionElapsedMs: getMissionElapsedMs(),
     completedAt,
     tasks,
@@ -1172,10 +1204,10 @@ export function useConductorGateway() {
     conductorSettings,
     setConductorSettings,
     sendMission: (nextGoal: string) => sendMission.mutateAsync({ nextGoal, settings: conductorSettings }),
-    steerAgent: (sessionKey: string, message: string) => steerAgent.mutateAsync({ sessionKey, message }),
+    sendSessionMessage: (sessionKey: string, message: string) => sendSessionMessage.mutateAsync({ sessionKey, message }),
     pauseAgent: (sessionKey: string, pause: boolean) => pauseAgent.mutateAsync({ sessionKey, pause }),
     isSending: sendMission.isPending,
-    isSteering: steerAgent.isPending,
+    isSteering: sendSessionMessage.isPending,
     isPausing: pauseAgent.isPending,
     resetMission,
     stopMission,

@@ -197,13 +197,33 @@ const WORKING_STEPS = [
   '🚀 Almost there…',
 ]
 
-function CyclingStatus({ steps, intervalMs = 3000 }: { steps: string[]; intervalMs?: number }) {
+function CyclingStatus({
+  steps,
+  intervalMs = 3000,
+  isPaused = false,
+}: {
+  steps: string[]
+  intervalMs?: number
+  isPaused?: boolean
+}) {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
+    if (isPaused) return
     const timer = window.setInterval(() => setStep((current) => (current + 1) % steps.length), intervalMs)
     return () => window.clearInterval(timer)
-  }, [steps.length, intervalMs])
+  }, [isPaused, steps.length, intervalMs])
+
+  if (isPaused) {
+    return (
+      <div className="flex items-center gap-3 py-3">
+        <div className="flex size-3.5 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-[9px] text-amber-300">
+          ||
+        </div>
+        <p className="text-sm text-[var(--theme-muted)]">Paused</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center gap-3 py-3">
@@ -466,10 +486,15 @@ export function Conductor() {
   const availableModels = modelsQuery.data ?? []
 
   useEffect(() => {
-    if (conductor.phase === 'idle' || conductor.phase === 'complete') return
+    if (conductor.phase === 'idle' || conductor.phase === 'complete' || conductor.isPaused) return
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
-  }, [conductor.phase])
+  }, [conductor.isPaused, conductor.phase])
+
+  useEffect(() => {
+    if (!conductor.isPaused) return
+    setNow(conductor.pausedAtMs ?? Date.now())
+  }, [conductor.isPaused, conductor.pausedAtMs])
 
 
   // Set body background to match Conductor theme so no gray shows behind keyboard/tab bar
@@ -520,7 +545,17 @@ export function Conductor() {
     if (!trimmed || !conductor.orchestratorSessionKey) return
 
     try {
-      await conductor.steerAgent(conductor.orchestratorSessionKey, `[STEER] ${trimmed}`)
+      const activeWorkerSessionKeys = conductor.workers
+        .filter((worker) => worker.status === 'running')
+        .map((worker) => worker.key)
+      const sessionKeys = [...new Set([conductor.orchestratorSessionKey, ...activeWorkerSessionKeys])]
+      const results = await Promise.allSettled(
+        sessionKeys.map((sessionKey) => conductor.sendSessionMessage(sessionKey, `[STEER] ${trimmed}`)),
+      )
+      const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      if (failures.length > 0) {
+        throw failures[0].reason instanceof Error ? failures[0].reason : new Error('Failed to send steer message')
+      }
       setSteerDraft('')
       setSteerError(null)
       setSteerHistory((current) => [...current, trimmed])
@@ -571,17 +606,18 @@ export function Conductor() {
         const persona = getAgentPersona(index)
         const currentTask = conductor.tasks.find((task) => task.workerKey === worker.key && task.status === 'running')?.title
         const lastLine = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+        const isWorkerPaused = conductor.isPaused && (worker.status === 'running' || worker.status === 'idle')
 
         return {
           id: worker.key,
           name: persona.name,
           modelId: worker.model || 'auto',
           roleDescription: worker.displayName,
-          status: worker.status === 'complete' ? 'idle' : worker.status === 'stale' ? 'error' : 'active',
-          lastLine,
+          status: isWorkerPaused ? 'paused' : worker.status === 'complete' ? 'idle' : worker.status === 'stale' ? 'error' : 'active',
+          lastLine: isWorkerPaused ? 'Paused' : lastLine,
           lastAt: worker.updatedAt ? new Date(worker.updatedAt).getTime() : undefined,
           taskCount: conductor.tasks.filter((task) => task.workerKey === worker.key).length,
-          currentTask,
+          currentTask: isWorkerPaused ? 'Paused' : currentTask,
           sessionKey: worker.key,
         }
       })
@@ -600,7 +636,7 @@ export function Conductor() {
         sessionKey: 'conductor-placeholder-agent',
       },
     ]
-  }, [conductor.conductorSettings.workerModel, conductor.goal, conductor.tasks, conductor.workerOutputs, conductor.workers])
+  }, [conductor.conductorSettings.workerModel, conductor.goal, conductor.isPaused, conductor.tasks, conductor.workerOutputs, conductor.workers])
 
   const completePhaseProjectPath = useMemo(() => {
     const workerOutputTexts = [
@@ -634,7 +670,19 @@ export function Conductor() {
     ? `/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`
     : null
 
-  const selectedHistoryOutputPath = conductor.selectedHistoryEntry?.outputPath ?? null
+  const selectedHistoryOutputPath = useMemo(() => {
+    const entry = conductor.selectedHistoryEntry
+    if (!entry) return null
+    if (entry.outputPath) return entry.outputPath
+    if (entry.projectPath) return entry.projectPath
+    const extractedOutputPath = extractProjectPath(entry.outputText ?? '') ?? extractProjectPath(entry.streamText ?? '')
+    if (extractedOutputPath) return extractedOutputPath
+    const candidates = buildProjectPathCandidates(
+      (entry.workerDetails ?? []).map((worker) => ({ label: worker.label })),
+      entry.startedAt,
+    )
+    return candidates[0] ?? null
+  }, [conductor.selectedHistoryEntry])
   const selectedHistoryOutputLabel = useMemo(
     () => getOutputDisplayName(selectedHistoryOutputPath),
     [selectedHistoryOutputPath],
@@ -727,6 +775,7 @@ export function Conductor() {
       const historyWorkerDetails = selectedHistoryEntry.workerDetails ?? []
       const historySummary = selectedHistoryEntry.completeSummary ?? selectedHistoryEntry.streamText
       const historyOutputText = selectedHistoryEntry.outputText?.trim() || selectedHistoryEntry.streamText?.trim() || ''
+      const showHistoryOutputFallback = !!historyOutputText && (!selectedHistoryOutputPath || selectedHistoryPreview.unavailable)
       const historyStatusLabel = selectedHistoryEntry.status === 'completed' ? 'Complete' : 'Stopped'
       const historyStatusClasses =
         selectedHistoryEntry.status === 'completed'
@@ -804,7 +853,7 @@ export function Conductor() {
                   </div>
                 </section>
               ) : selectedHistoryOutputPath && selectedHistoryPreview.unavailable ? (
-                <p className="px-1 text-sm text-[var(--theme-muted)]">No preview available.</p>
+                showHistoryOutputFallback ? null : <p className="px-1 text-sm text-[var(--theme-muted)]">No preview available.</p>
               ) : null}
 
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -855,14 +904,28 @@ export function Conductor() {
                 )}
               </section>
 
-              {historyOutputText && (
+              {showHistoryOutputFallback ? (
+                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output</p>
+                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
+                        Preview unavailable{selectedHistoryOutputPath ? ` for ${selectedHistoryOutputLabel}` : ''}.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+                    <Markdown className="max-h-[600px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{historyOutputText}</Markdown>
+                  </div>
+                </section>
+              ) : historyOutputText ? (
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Output</p>
                   <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                     <Markdown className="max-h-[600px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{historyOutputText}</Markdown>
                   </div>
                 </section>
-              )}
+              ) : null}
 
               {!historySummary && historyWorkerDetails.length === 0 && !selectedHistoryOutputPath && !selectedHistoryEntry.workerSummary?.length && !historyOutputText && (
                 <section className="overflow-hidden rounded-3xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
@@ -1640,10 +1703,12 @@ export function Conductor() {
                             : typeof worker.raw.startedAt === 'string'
                               ? worker.raw.startedAt
                               : conductor.missionStartedAt
-                        const workerEndTime =
-                          worker.status === 'complete' || worker.status === 'stale'
-                            ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
-                            : now
+                          const workerEndTime =
+                            worker.status === 'complete' || worker.status === 'stale'
+                              ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
+                              : conductor.isPaused
+                                ? conductor.pausedAtMs ?? now
+                                : now
                         return (
                           <div
                             key={worker.key}
@@ -1690,7 +1755,7 @@ export function Conductor() {
                               {workerOutput ? (
                                 <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
                               ) : (
-                                <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} />
+                                <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} isPaused={conductor.isPaused} />
                               )}
                             </div>
                           </div>
@@ -1725,7 +1790,9 @@ export function Conductor() {
                   const workerEndTime =
                     worker.status === 'complete' || worker.status === 'stale'
                       ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
-                      : now
+                      : conductor.isPaused
+                        ? conductor.pausedAtMs ?? now
+                        : now
                   return (
                     <div
                       key={worker.key}
@@ -1772,7 +1839,7 @@ export function Conductor() {
                         {workerOutput ? (
                           <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
                         ) : (
-                          <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} />
+                          <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} isPaused={conductor.isPaused} />
                         )}
                       </div>
                     </div>
