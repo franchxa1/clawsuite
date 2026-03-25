@@ -531,8 +531,8 @@ export function Conductor() {
           : 'border border-red-400/35 bg-red-500/10 text-red-300'
 
       return (
-        <div className="flex h-full min-h-full flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-6 py-8">
+        <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
             <div className="space-y-6">
               <button
                 type="button"
@@ -656,18 +656,11 @@ export function Conductor() {
     }
 
     return (
-      <div className="flex h-full min-h-full flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-6 py-8">
+      <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="w-full space-y-8">
-            <div className="relative space-y-3 text-center">
-              <div className="absolute right-0 top-0 flex items-center gap-2">
-                <Button
-                  type="button"
-                  onClick={handleNewMission}
-                  className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 text-[var(--theme-muted)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                >
-                  New Mission
-                </Button>
+            <div className="space-y-3 text-center">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setSettingsOpen(true)}
@@ -681,12 +674,19 @@ export function Conductor() {
                 Conductor
                 <span className="size-2 rounded-full bg-emerald-400" />
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-[var(--theme-text)] md:text-4xl">
+              <h1 className="text-2xl font-semibold tracking-tight text-[var(--theme-text)] md:text-4xl">
                 What should the team do next?
               </h1>
               <p className="text-sm text-[var(--theme-muted-2)]">
                 Describe the mission. The agent will decompose it in chat, then the worker sessions will appear here live.
               </p>
+              <button
+                type="button"
+                onClick={handleNewMission}
+                className="text-xs text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-accent)]"
+              >
+                ↻ Reset
+              </button>
             </div>
 
             <section className="w-full overflow-hidden rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -961,8 +961,8 @@ export function Conductor() {
 
   if (phase === 'preview') {
     return (
-      <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-6 py-8">
+      <div className="flex min-h-dvh flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="space-y-6">
             <div className="space-y-2 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
@@ -1036,8 +1036,8 @@ export function Conductor() {
 
   if (phase === 'complete') {
     return (
-      <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-6 py-8">
+      <div className="flex min-h-dvh flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="space-y-6">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
@@ -1230,8 +1230,8 @@ export function Conductor() {
   }
 
   return (
-    <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-6 py-8">
+    <div className="flex min-h-dvh flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+      <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
         <div className="flex w-full flex-col gap-6">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
