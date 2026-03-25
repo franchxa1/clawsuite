@@ -358,6 +358,22 @@ export function Conductor() {
     [completePhaseProjectPath],
   )
 
+  const previewUrl = completePhaseProjectPath
+    ? `/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`
+    : null
+
+  const previewReady = useQuery({
+    queryKey: ['conductor', 'preview-probe', previewUrl],
+    queryFn: async () => {
+      if (!previewUrl) return false
+      const res = await fetch(previewUrl, { method: 'HEAD' })
+      return res.ok
+    },
+    enabled: !!previewUrl && phase === 'complete',
+    refetchInterval: (query) => (query.state.data === true ? false : 2_000),
+    staleTime: 5_000,
+  })
+
   const completedTaskOutputs = useMemo(() => {
     return conductor.tasks
       .filter((task) => task.output)
@@ -982,7 +998,7 @@ export function Conductor() {
               </div>
             </div>
 
-            {completePhaseProjectPath ? (
+            {completePhaseProjectPath && previewReady.data === true ? (
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -992,7 +1008,7 @@ export function Conductor() {
                     </p>
                   </div>
                   <a
-                    href={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
+                    href={previewUrl!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
@@ -1002,14 +1018,14 @@ export function Conductor() {
                 </div>
                 <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
                   <iframe
-                    src={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
+                    src={previewUrl!}
                     className="h-[500px] w-full"
                     sandbox="allow-scripts allow-same-origin"
                     title="Mission output preview"
                   />
                 </div>
               </section>
-            ) : Object.keys(conductor.workerOutputs).length === 0 && !conductor.streamError ? (
+            ) : (completePhaseProjectPath || Object.keys(conductor.workerOutputs).length === 0) && !conductor.streamError ? (
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center gap-3 text-sm text-[var(--theme-muted)]">
                   <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
