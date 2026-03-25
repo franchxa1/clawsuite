@@ -9,10 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WorkspaceTeamsRouteImport } from './routes/workspace-teams'
-import { Route as WorkspaceSkillsRouteImport } from './routes/workspace-skills'
-import { Route as WorkspaceAgentsRouteImport } from './routes/workspace-agents'
-import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as WizardRouteImport } from './routes/wizard'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
@@ -20,17 +16,10 @@ import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionsRouteImport } from './routes/sessions'
-import { Route as RunsRouteImport } from './routes/runs'
-import { Route as ReviewRouteImport } from './routes/review'
-import { Route as ProjectsRouteImport } from './routes/projects'
-import { Route as PlanReviewRouteImport } from './routes/plan-review'
 import { Route as NodesRouteImport } from './routes/nodes'
-import { Route as NewProjectRouteImport } from './routes/new-project'
 import { Route as NewRouteImport } from './routes/new'
-import { Route as MissionConsoleRouteImport } from './routes/mission-console'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
-import { Route as InstancesRouteImport } from './routes/instances'
 import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DebugRouteImport } from './routes/debug'
@@ -40,7 +29,6 @@ import { Route as CostsRouteImport } from './routes/costs'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as ChannelsRouteImport } from './routes/channels'
-import { Route as BrowserRouteImport } from './routes/browser'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as ActivityRouteImport } from './routes/activity'
@@ -104,20 +92,6 @@ import { Route as ApiAgentKillRouteImport } from './routes/api/agent-kill'
 import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
-import { Route as ApiWorkspaceTeamsRouteImport } from './routes/api/workspace/teams'
-import { Route as ApiWorkspaceTasksRouteImport } from './routes/api/workspace/tasks'
-import { Route as ApiWorkspaceTaskRunsRouteImport } from './routes/api/workspace/task-runs'
-import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
-import { Route as ApiWorkspaceSkillsRouteImport } from './routes/api/workspace/skills'
-import { Route as ApiWorkspaceProjectsRouteImport } from './routes/api/workspace/projects'
-import { Route as ApiWorkspacePhasesRouteImport } from './routes/api/workspace/phases'
-import { Route as ApiWorkspaceMissionsRouteImport } from './routes/api/workspace/missions'
-import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
-import { Route as ApiWorkspaceEventsRouteImport } from './routes/api/workspace/events'
-import { Route as ApiWorkspaceDecomposeRouteImport } from './routes/api/workspace/decompose'
-import { Route as ApiWorkspaceConfigRouteImport } from './routes/api/workspace/config'
-import { Route as ApiWorkspaceCheckpointsRouteImport } from './routes/api/workspace/checkpoints'
-import { Route as ApiWorkspaceAgentsRouteImport } from './routes/api/workspace/agents'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
@@ -148,58 +122,11 @@ import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/statu
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
 import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
 import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
-import { Route as ApiWorkspaceTasksIdRouteImport } from './routes/api/workspace/tasks.$id'
-import { Route as ApiWorkspaceTaskRunsAdhocRouteImport } from './routes/api/workspace/task-runs.adhoc'
-import { Route as ApiWorkspaceProjectsIdRouteImport } from './routes/api/workspace/projects.$id'
-import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/workspace/checkpoints.$id'
-import { Route as ApiWorkspaceAgentsIdRouteImport } from './routes/api/workspace/agents.$id'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents.$pid.kill'
-import { Route as ApiWorkspaceTeamsIdApprovalConfigRouteImport } from './routes/api/workspace/teams.$id.approval-config'
-import { Route as ApiWorkspaceTaskRunsIdStopRouteImport } from './routes/api/workspace/task-runs.$id.stop'
-import { Route as ApiWorkspaceTaskRunsIdRetryRouteImport } from './routes/api/workspace/task-runs.$id.retry'
-import { Route as ApiWorkspaceTaskRunsIdPauseRouteImport } from './routes/api/workspace/task-runs.$id.pause'
-import { Route as ApiWorkspaceTaskRunsIdEventsRouteImport } from './routes/api/workspace/task-runs.$id.events'
-import { Route as ApiWorkspaceSkillsIdContentRouteImport } from './routes/api/workspace/skills.$id.content'
-import { Route as ApiWorkspaceProjectsIdFilesRouteImport } from './routes/api/workspace/projects.$id.files'
-import { Route as ApiWorkspaceMissionsIdStopRouteImport } from './routes/api/workspace/missions.$id.stop'
-import { Route as ApiWorkspaceMissionsIdStatusRouteImport } from './routes/api/workspace/missions.$id.status'
-import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/workspace/missions.$id.start'
-import { Route as ApiWorkspaceMissionsIdResumeRouteImport } from './routes/api/workspace/missions.$id.resume'
-import { Route as ApiWorkspaceMissionsIdPauseRouteImport } from './routes/api/workspace/missions.$id.pause'
-import { Route as ApiWorkspaceMissionsIdLiveRouteImport } from './routes/api/workspace/missions.$id.live'
-import { Route as ApiWorkspaceDispatchFilesSplatRouteImport } from './routes/api/workspace/dispatch.files.$'
-import { Route as ApiWorkspaceCheckpointsIdVerifyTscRouteImport } from './routes/api/workspace/checkpoints.$id.verify-tsc'
-import { Route as ApiWorkspaceCheckpointsIdReviseRouteImport } from './routes/api/workspace/checkpoints.$id.revise'
-import { Route as ApiWorkspaceCheckpointsIdRejectRouteImport } from './routes/api/workspace/checkpoints.$id.reject'
-import { Route as ApiWorkspaceCheckpointsIdDiffRouteImport } from './routes/api/workspace/checkpoints.$id.diff'
-import { Route as ApiWorkspaceCheckpointsIdApproveAndPrRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-pr'
-import { Route as ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-merge'
-import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from './routes/api/workspace/checkpoints.$id.approve-and-commit'
-import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
-const WorkspaceTeamsRoute = WorkspaceTeamsRouteImport.update({
-  id: '/workspace-teams',
-  path: '/workspace-teams',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceSkillsRoute = WorkspaceSkillsRouteImport.update({
-  id: '/workspace-skills',
-  path: '/workspace-skills',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceAgentsRoute = WorkspaceAgentsRouteImport.update({
-  id: '/workspace-agents',
-  path: '/workspace-agents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WorkspaceRoute = WorkspaceRouteImport.update({
-  id: '/workspace',
-  path: '/workspace',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const WizardRoute = WizardRouteImport.update({
   id: '/wizard',
   path: '/wizard',
@@ -235,44 +162,14 @@ const SessionsRoute = SessionsRouteImport.update({
   path: '/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RunsRoute = RunsRouteImport.update({
-  id: '/runs',
-  path: '/runs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewRoute = ReviewRouteImport.update({
-  id: '/review',
-  path: '/review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsRoute = ProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlanReviewRoute = PlanReviewRouteImport.update({
-  id: '/plan-review',
-  path: '/plan-review',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const NodesRoute = NodesRouteImport.update({
   id: '/nodes',
   path: '/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const NewProjectRoute = NewProjectRouteImport.update({
-  id: '/new-project',
-  path: '/new-project',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const NewRoute = NewRouteImport.update({
   id: '/new',
   path: '/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MissionConsoleRoute = MissionConsoleRouteImport.update({
-  id: '/mission-console',
-  path: '/mission-console',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MemoryRoute = MemoryRouteImport.update({
@@ -283,11 +180,6 @@ const MemoryRoute = MemoryRouteImport.update({
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InstancesRoute = InstancesRouteImport.update({
-  id: '/instances',
-  path: '/instances',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GatewayRoute = GatewayRouteImport.update({
@@ -333,11 +225,6 @@ const ConductorRoute = ConductorRouteImport.update({
 const ChannelsRoute = ChannelsRouteImport.update({
   id: '/channels',
   path: '/channels',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrowserRoute = BrowserRouteImport.update({
-  id: '/browser',
-  path: '/browser',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsRoute = AgentsRouteImport.update({
@@ -655,76 +542,6 @@ const ApiTasksIndexRoute = ApiTasksIndexRouteImport.update({
   path: '/api/tasks/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkspaceTeamsRoute = ApiWorkspaceTeamsRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceTasksRoute = ApiWorkspaceTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceTaskRunsRoute = ApiWorkspaceTaskRunsRouteImport.update({
-  id: '/task-runs',
-  path: '/task-runs',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceSkillsRoute = ApiWorkspaceSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceProjectsRoute = ApiWorkspaceProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspacePhasesRoute = ApiWorkspacePhasesRouteImport.update({
-  id: '/phases',
-  path: '/phases',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceMissionsRoute = ApiWorkspaceMissionsRouteImport.update({
-  id: '/missions',
-  path: '/missions',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceMemoryFilesRoute = ApiWorkspaceMemoryFilesRouteImport.update({
-  id: '/memory-files',
-  path: '/memory-files',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceEventsRoute = ApiWorkspaceEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceDecomposeRoute = ApiWorkspaceDecomposeRouteImport.update({
-  id: '/decompose',
-  path: '/decompose',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceConfigRoute = ApiWorkspaceConfigRouteImport.update({
-  id: '/config',
-  path: '/config',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceCheckpointsRoute = ApiWorkspaceCheckpointsRouteImport.update({
-  id: '/checkpoints',
-  path: '/checkpoints',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
-const ApiWorkspaceAgentsRoute = ApiWorkspaceAgentsRouteImport.update({
-  id: '/agents',
-  path: '/agents',
-  getParentRoute: () => ApiWorkspaceRoute,
-} as any)
 const ApiTasksTaskIdRoute = ApiTasksTaskIdRouteImport.update({
   id: '/api/tasks/$taskId',
   path: '/api/tasks/$taskId',
@@ -876,33 +693,6 @@ const ApiGatewayApprovalsIndexRoute =
     path: '/api/gateway/approvals/',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiWorkspaceTasksIdRoute = ApiWorkspaceTasksIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiWorkspaceTasksRoute,
-} as any)
-const ApiWorkspaceTaskRunsAdhocRoute =
-  ApiWorkspaceTaskRunsAdhocRouteImport.update({
-    id: '/adhoc',
-    path: '/adhoc',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceProjectsIdRoute = ApiWorkspaceProjectsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiWorkspaceProjectsRoute,
-} as any)
-const ApiWorkspaceCheckpointsIdRoute =
-  ApiWorkspaceCheckpointsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiWorkspaceCheckpointsRoute,
-  } as any)
-const ApiWorkspaceAgentsIdRoute = ApiWorkspaceAgentsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiWorkspaceAgentsRoute,
-} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -919,138 +709,6 @@ const ApiCliAgentsPidKillRoute = ApiCliAgentsPidKillRouteImport.update({
   path: '/$pid/kill',
   getParentRoute: () => ApiCliAgentsRoute,
 } as any)
-const ApiWorkspaceTeamsIdApprovalConfigRoute =
-  ApiWorkspaceTeamsIdApprovalConfigRouteImport.update({
-    id: '/$id/approval-config',
-    path: '/$id/approval-config',
-    getParentRoute: () => ApiWorkspaceTeamsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdStopRoute =
-  ApiWorkspaceTaskRunsIdStopRouteImport.update({
-    id: '/$id/stop',
-    path: '/$id/stop',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdRetryRoute =
-  ApiWorkspaceTaskRunsIdRetryRouteImport.update({
-    id: '/$id/retry',
-    path: '/$id/retry',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdPauseRoute =
-  ApiWorkspaceTaskRunsIdPauseRouteImport.update({
-    id: '/$id/pause',
-    path: '/$id/pause',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceTaskRunsIdEventsRoute =
-  ApiWorkspaceTaskRunsIdEventsRouteImport.update({
-    id: '/$id/events',
-    path: '/$id/events',
-    getParentRoute: () => ApiWorkspaceTaskRunsRoute,
-  } as any)
-const ApiWorkspaceSkillsIdContentRoute =
-  ApiWorkspaceSkillsIdContentRouteImport.update({
-    id: '/$id/content',
-    path: '/$id/content',
-    getParentRoute: () => ApiWorkspaceSkillsRoute,
-  } as any)
-const ApiWorkspaceProjectsIdFilesRoute =
-  ApiWorkspaceProjectsIdFilesRouteImport.update({
-    id: '/files',
-    path: '/files',
-    getParentRoute: () => ApiWorkspaceProjectsIdRoute,
-  } as any)
-const ApiWorkspaceMissionsIdStopRoute =
-  ApiWorkspaceMissionsIdStopRouteImport.update({
-    id: '/$id/stop',
-    path: '/$id/stop',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdStatusRoute =
-  ApiWorkspaceMissionsIdStatusRouteImport.update({
-    id: '/$id/status',
-    path: '/$id/status',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdStartRoute =
-  ApiWorkspaceMissionsIdStartRouteImport.update({
-    id: '/$id/start',
-    path: '/$id/start',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdResumeRoute =
-  ApiWorkspaceMissionsIdResumeRouteImport.update({
-    id: '/$id/resume',
-    path: '/$id/resume',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdPauseRoute =
-  ApiWorkspaceMissionsIdPauseRouteImport.update({
-    id: '/$id/pause',
-    path: '/$id/pause',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceMissionsIdLiveRoute =
-  ApiWorkspaceMissionsIdLiveRouteImport.update({
-    id: '/$id/live',
-    path: '/$id/live',
-    getParentRoute: () => ApiWorkspaceMissionsRoute,
-  } as any)
-const ApiWorkspaceDispatchFilesSplatRoute =
-  ApiWorkspaceDispatchFilesSplatRouteImport.update({
-    id: '/dispatch/files/$',
-    path: '/dispatch/files/$',
-    getParentRoute: () => ApiWorkspaceRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdVerifyTscRoute =
-  ApiWorkspaceCheckpointsIdVerifyTscRouteImport.update({
-    id: '/verify-tsc',
-    path: '/verify-tsc',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdReviseRoute =
-  ApiWorkspaceCheckpointsIdReviseRouteImport.update({
-    id: '/revise',
-    path: '/revise',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdRejectRoute =
-  ApiWorkspaceCheckpointsIdRejectRouteImport.update({
-    id: '/reject',
-    path: '/reject',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdDiffRoute =
-  ApiWorkspaceCheckpointsIdDiffRouteImport.update({
-    id: '/diff',
-    path: '/diff',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveAndPrRoute =
-  ApiWorkspaceCheckpointsIdApproveAndPrRouteImport.update({
-    id: '/approve-and-pr',
-    path: '/approve-and-pr',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveAndMergeRoute =
-  ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport.update({
-    id: '/approve-and-merge',
-    path: '/approve-and-merge',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveAndCommitRoute =
-  ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport.update({
-    id: '/approve-and-commit',
-    path: '/approve-and-commit',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
-const ApiWorkspaceCheckpointsIdApproveRoute =
-  ApiWorkspaceCheckpointsIdApproveRouteImport.update({
-    id: '/approve',
-    path: '/approve',
-    getParentRoute: () => ApiWorkspaceCheckpointsIdRoute,
-  } as any)
 const ApiGatewayApprovalsApprovalIdActionRoute =
   ApiGatewayApprovalsApprovalIdActionRouteImport.update({
     id: '/api/gateway/approvals/$approvalId/$action',
@@ -1064,7 +722,6 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/agents': typeof AgentsRoute
-  '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/conductor': typeof ConductorRoute
   '/connect': typeof ConnectRoute
@@ -1074,17 +731,10 @@ export interface FileRoutesByFullPath {
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/gateway': typeof GatewayRouteWithChildren
-  '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
-  '/mission-console': typeof MissionConsoleRoute
   '/new': typeof NewRoute
-  '/new-project': typeof NewProjectRoute
   '/nodes': typeof NodesRoute
-  '/plan-review': typeof PlanReviewRoute
-  '/projects': typeof ProjectsRoute
-  '/review': typeof ReviewRoute
-  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1092,10 +742,6 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRoute
-  '/workspace-agents': typeof WorkspaceAgentsRoute
-  '/workspace-skills': typeof WorkspaceSkillsRoute
-  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1147,7 +793,7 @@ export interface FileRoutesByFullPath {
   '/api/usage': typeof ApiUsageRoute
   '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1182,53 +828,12 @@ export interface FileRoutesByFullPath {
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
-  '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
-  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
-  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
-  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
-  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
-  '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
-  '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
-  '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
-  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
-  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
-  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
-  '/api/workspace/tasks': typeof ApiWorkspaceTasksRouteWithChildren
-  '/api/workspace/teams': typeof ApiWorkspaceTeamsRouteWithChildren
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
-  '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRouteWithChildren
-  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/workspace/tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
-  '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
-  '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  '/api/workspace/checkpoints/$id/approve-and-pr': typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  '/api/workspace/checkpoints/$id/diff': typeof ApiWorkspaceCheckpointsIdDiffRoute
-  '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
-  '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
-  '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-  '/api/workspace/dispatch/files/$': typeof ApiWorkspaceDispatchFilesSplatRoute
-  '/api/workspace/missions/$id/live': typeof ApiWorkspaceMissionsIdLiveRoute
-  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
-  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
-  '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
-  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
-  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
-  '/api/workspace/projects/$id/files': typeof ApiWorkspaceProjectsIdFilesRoute
-  '/api/workspace/skills/$id/content': typeof ApiWorkspaceSkillsIdContentRoute
-  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
-  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
-  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
-  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
-  '/api/workspace/teams/$id/approval-config': typeof ApiWorkspaceTeamsIdApprovalConfigRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1236,7 +841,6 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/agents': typeof AgentsRoute
-  '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/conductor': typeof ConductorRoute
   '/connect': typeof ConnectRoute
@@ -1246,27 +850,16 @@ export interface FileRoutesByTo {
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/gateway': typeof GatewayRouteWithChildren
-  '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
-  '/mission-console': typeof MissionConsoleRoute
   '/new': typeof NewRoute
-  '/new-project': typeof NewProjectRoute
   '/nodes': typeof NodesRoute
-  '/plan-review': typeof PlanReviewRoute
-  '/projects': typeof ProjectsRoute
-  '/review': typeof ReviewRoute
-  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRoute
-  '/workspace-agents': typeof WorkspaceAgentsRoute
-  '/workspace-skills': typeof WorkspaceSkillsRoute
-  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1318,7 +911,7 @@ export interface FileRoutesByTo {
   '/api/usage': typeof ApiUsageRoute
   '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1353,53 +946,12 @@ export interface FileRoutesByTo {
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
-  '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
-  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
-  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
-  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
-  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
-  '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
-  '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
-  '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
-  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
-  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
-  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
-  '/api/workspace/tasks': typeof ApiWorkspaceTasksRouteWithChildren
-  '/api/workspace/teams': typeof ApiWorkspaceTeamsRouteWithChildren
   '/api/tasks': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
-  '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRouteWithChildren
-  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/workspace/tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
-  '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
-  '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  '/api/workspace/checkpoints/$id/approve-and-pr': typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  '/api/workspace/checkpoints/$id/diff': typeof ApiWorkspaceCheckpointsIdDiffRoute
-  '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
-  '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
-  '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-  '/api/workspace/dispatch/files/$': typeof ApiWorkspaceDispatchFilesSplatRoute
-  '/api/workspace/missions/$id/live': typeof ApiWorkspaceMissionsIdLiveRoute
-  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
-  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
-  '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
-  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
-  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
-  '/api/workspace/projects/$id/files': typeof ApiWorkspaceProjectsIdFilesRoute
-  '/api/workspace/skills/$id/content': typeof ApiWorkspaceSkillsIdContentRoute
-  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
-  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
-  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
-  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
-  '/api/workspace/teams/$id/approval-config': typeof ApiWorkspaceTeamsIdApprovalConfigRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1408,7 +960,6 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/agents': typeof AgentsRoute
-  '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/conductor': typeof ConductorRoute
   '/connect': typeof ConnectRoute
@@ -1418,17 +969,10 @@ export interface FileRoutesById {
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/gateway': typeof GatewayRouteWithChildren
-  '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
-  '/mission-console': typeof MissionConsoleRoute
   '/new': typeof NewRoute
-  '/new-project': typeof NewProjectRoute
   '/nodes': typeof NodesRoute
-  '/plan-review': typeof PlanReviewRoute
-  '/projects': typeof ProjectsRoute
-  '/review': typeof ReviewRoute
-  '/runs': typeof RunsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1436,10 +980,6 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/wizard': typeof WizardRoute
-  '/workspace': typeof WorkspaceRoute
-  '/workspace-agents': typeof WorkspaceAgentsRoute
-  '/workspace-skills': typeof WorkspaceSkillsRoute
-  '/workspace-teams': typeof WorkspaceTeamsRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1491,7 +1031,7 @@ export interface FileRoutesById {
   '/api/usage': typeof ApiUsageRoute
   '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/gateway/logs': typeof GatewayLogsRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1526,53 +1066,12 @@ export interface FileRoutesById {
   '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
-  '/api/workspace/agents': typeof ApiWorkspaceAgentsRouteWithChildren
-  '/api/workspace/checkpoints': typeof ApiWorkspaceCheckpointsRouteWithChildren
-  '/api/workspace/config': typeof ApiWorkspaceConfigRoute
-  '/api/workspace/decompose': typeof ApiWorkspaceDecomposeRoute
-  '/api/workspace/events': typeof ApiWorkspaceEventsRoute
-  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
-  '/api/workspace/missions': typeof ApiWorkspaceMissionsRouteWithChildren
-  '/api/workspace/phases': typeof ApiWorkspacePhasesRoute
-  '/api/workspace/projects': typeof ApiWorkspaceProjectsRouteWithChildren
-  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
-  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
-  '/api/workspace/task-runs': typeof ApiWorkspaceTaskRunsRouteWithChildren
-  '/api/workspace/tasks': typeof ApiWorkspaceTasksRouteWithChildren
-  '/api/workspace/teams': typeof ApiWorkspaceTeamsRouteWithChildren
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
-  '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
-  '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRouteWithChildren
-  '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
-  '/api/workspace/tasks/$id': typeof ApiWorkspaceTasksIdRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
   '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
-  '/api/workspace/checkpoints/$id/approve': typeof ApiWorkspaceCheckpointsIdApproveRoute
-  '/api/workspace/checkpoints/$id/approve-and-commit': typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  '/api/workspace/checkpoints/$id/approve-and-merge': typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  '/api/workspace/checkpoints/$id/approve-and-pr': typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  '/api/workspace/checkpoints/$id/diff': typeof ApiWorkspaceCheckpointsIdDiffRoute
-  '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
-  '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
-  '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-  '/api/workspace/dispatch/files/$': typeof ApiWorkspaceDispatchFilesSplatRoute
-  '/api/workspace/missions/$id/live': typeof ApiWorkspaceMissionsIdLiveRoute
-  '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
-  '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
-  '/api/workspace/missions/$id/start': typeof ApiWorkspaceMissionsIdStartRoute
-  '/api/workspace/missions/$id/status': typeof ApiWorkspaceMissionsIdStatusRoute
-  '/api/workspace/missions/$id/stop': typeof ApiWorkspaceMissionsIdStopRoute
-  '/api/workspace/projects/$id/files': typeof ApiWorkspaceProjectsIdFilesRoute
-  '/api/workspace/skills/$id/content': typeof ApiWorkspaceSkillsIdContentRoute
-  '/api/workspace/task-runs/$id/events': typeof ApiWorkspaceTaskRunsIdEventsRoute
-  '/api/workspace/task-runs/$id/pause': typeof ApiWorkspaceTaskRunsIdPauseRoute
-  '/api/workspace/task-runs/$id/retry': typeof ApiWorkspaceTaskRunsIdRetryRoute
-  '/api/workspace/task-runs/$id/stop': typeof ApiWorkspaceTaskRunsIdStopRoute
-  '/api/workspace/teams/$id/approval-config': typeof ApiWorkspaceTeamsIdApprovalConfigRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1582,7 +1081,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/agent-swarm'
     | '/agents'
-    | '/browser'
     | '/channels'
     | '/conductor'
     | '/connect'
@@ -1592,17 +1090,10 @@ export interface FileRouteTypes {
     | '/debug'
     | '/files'
     | '/gateway'
-    | '/instances'
     | '/logs'
     | '/memory'
-    | '/mission-console'
     | '/new'
-    | '/new-project'
     | '/nodes'
-    | '/plan-review'
-    | '/projects'
-    | '/review'
-    | '/runs'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1610,10 +1101,6 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
-    | '/workspace'
-    | '/workspace-agents'
-    | '/workspace-skills'
-    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1700,53 +1187,12 @@ export interface FileRouteTypes {
     | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
-    | '/api/workspace/agents'
-    | '/api/workspace/checkpoints'
-    | '/api/workspace/config'
-    | '/api/workspace/decompose'
-    | '/api/workspace/events'
-    | '/api/workspace/memory-files'
-    | '/api/workspace/missions'
-    | '/api/workspace/phases'
-    | '/api/workspace/projects'
-    | '/api/workspace/skills'
-    | '/api/workspace/stats'
-    | '/api/workspace/task-runs'
-    | '/api/workspace/tasks'
-    | '/api/workspace/teams'
     | '/api/tasks/'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
-    | '/api/workspace/agents/$id'
-    | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/projects/$id'
-    | '/api/workspace/task-runs/adhoc'
-    | '/api/workspace/tasks/$id'
     | '/api/gateway/approvals/'
     | '/api/gateway/approvals/$approvalId/$action'
-    | '/api/workspace/checkpoints/$id/approve'
-    | '/api/workspace/checkpoints/$id/approve-and-commit'
-    | '/api/workspace/checkpoints/$id/approve-and-merge'
-    | '/api/workspace/checkpoints/$id/approve-and-pr'
-    | '/api/workspace/checkpoints/$id/diff'
-    | '/api/workspace/checkpoints/$id/reject'
-    | '/api/workspace/checkpoints/$id/revise'
-    | '/api/workspace/checkpoints/$id/verify-tsc'
-    | '/api/workspace/dispatch/files/$'
-    | '/api/workspace/missions/$id/live'
-    | '/api/workspace/missions/$id/pause'
-    | '/api/workspace/missions/$id/resume'
-    | '/api/workspace/missions/$id/start'
-    | '/api/workspace/missions/$id/status'
-    | '/api/workspace/missions/$id/stop'
-    | '/api/workspace/projects/$id/files'
-    | '/api/workspace/skills/$id/content'
-    | '/api/workspace/task-runs/$id/events'
-    | '/api/workspace/task-runs/$id/pause'
-    | '/api/workspace/task-runs/$id/retry'
-    | '/api/workspace/task-runs/$id/stop'
-    | '/api/workspace/teams/$id/approval-config'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1754,7 +1200,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/agent-swarm'
     | '/agents'
-    | '/browser'
     | '/channels'
     | '/conductor'
     | '/connect'
@@ -1764,27 +1209,16 @@ export interface FileRouteTypes {
     | '/debug'
     | '/files'
     | '/gateway'
-    | '/instances'
     | '/logs'
     | '/memory'
-    | '/mission-console'
     | '/new'
-    | '/new-project'
     | '/nodes'
-    | '/plan-review'
-    | '/projects'
-    | '/review'
-    | '/runs'
     | '/sessions'
     | '/skills'
     | '/tasks'
     | '/terminal'
     | '/usage'
     | '/wizard'
-    | '/workspace'
-    | '/workspace-agents'
-    | '/workspace-skills'
-    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1871,53 +1305,12 @@ export interface FileRouteTypes {
     | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
-    | '/api/workspace/agents'
-    | '/api/workspace/checkpoints'
-    | '/api/workspace/config'
-    | '/api/workspace/decompose'
-    | '/api/workspace/events'
-    | '/api/workspace/memory-files'
-    | '/api/workspace/missions'
-    | '/api/workspace/phases'
-    | '/api/workspace/projects'
-    | '/api/workspace/skills'
-    | '/api/workspace/stats'
-    | '/api/workspace/task-runs'
-    | '/api/workspace/tasks'
-    | '/api/workspace/teams'
     | '/api/tasks'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
-    | '/api/workspace/agents/$id'
-    | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/projects/$id'
-    | '/api/workspace/task-runs/adhoc'
-    | '/api/workspace/tasks/$id'
     | '/api/gateway/approvals'
     | '/api/gateway/approvals/$approvalId/$action'
-    | '/api/workspace/checkpoints/$id/approve'
-    | '/api/workspace/checkpoints/$id/approve-and-commit'
-    | '/api/workspace/checkpoints/$id/approve-and-merge'
-    | '/api/workspace/checkpoints/$id/approve-and-pr'
-    | '/api/workspace/checkpoints/$id/diff'
-    | '/api/workspace/checkpoints/$id/reject'
-    | '/api/workspace/checkpoints/$id/revise'
-    | '/api/workspace/checkpoints/$id/verify-tsc'
-    | '/api/workspace/dispatch/files/$'
-    | '/api/workspace/missions/$id/live'
-    | '/api/workspace/missions/$id/pause'
-    | '/api/workspace/missions/$id/resume'
-    | '/api/workspace/missions/$id/start'
-    | '/api/workspace/missions/$id/status'
-    | '/api/workspace/missions/$id/stop'
-    | '/api/workspace/projects/$id/files'
-    | '/api/workspace/skills/$id/content'
-    | '/api/workspace/task-runs/$id/events'
-    | '/api/workspace/task-runs/$id/pause'
-    | '/api/workspace/task-runs/$id/retry'
-    | '/api/workspace/task-runs/$id/stop'
-    | '/api/workspace/teams/$id/approval-config'
   id:
     | '__root__'
     | '/'
@@ -1925,7 +1318,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/agent-swarm'
     | '/agents'
-    | '/browser'
     | '/channels'
     | '/conductor'
     | '/connect'
@@ -1935,17 +1327,10 @@ export interface FileRouteTypes {
     | '/debug'
     | '/files'
     | '/gateway'
-    | '/instances'
     | '/logs'
     | '/memory'
-    | '/mission-console'
     | '/new'
-    | '/new-project'
     | '/nodes'
-    | '/plan-review'
-    | '/projects'
-    | '/review'
-    | '/runs'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1953,10 +1338,6 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/wizard'
-    | '/workspace'
-    | '/workspace-agents'
-    | '/workspace-skills'
-    | '/workspace-teams'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -2043,53 +1424,12 @@ export interface FileRouteTypes {
     | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
-    | '/api/workspace/agents'
-    | '/api/workspace/checkpoints'
-    | '/api/workspace/config'
-    | '/api/workspace/decompose'
-    | '/api/workspace/events'
-    | '/api/workspace/memory-files'
-    | '/api/workspace/missions'
-    | '/api/workspace/phases'
-    | '/api/workspace/projects'
-    | '/api/workspace/skills'
-    | '/api/workspace/stats'
-    | '/api/workspace/task-runs'
-    | '/api/workspace/tasks'
-    | '/api/workspace/teams'
     | '/api/tasks/'
     | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
-    | '/api/workspace/agents/$id'
-    | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/projects/$id'
-    | '/api/workspace/task-runs/adhoc'
-    | '/api/workspace/tasks/$id'
     | '/api/gateway/approvals/'
     | '/api/gateway/approvals/$approvalId/$action'
-    | '/api/workspace/checkpoints/$id/approve'
-    | '/api/workspace/checkpoints/$id/approve-and-commit'
-    | '/api/workspace/checkpoints/$id/approve-and-merge'
-    | '/api/workspace/checkpoints/$id/approve-and-pr'
-    | '/api/workspace/checkpoints/$id/diff'
-    | '/api/workspace/checkpoints/$id/reject'
-    | '/api/workspace/checkpoints/$id/revise'
-    | '/api/workspace/checkpoints/$id/verify-tsc'
-    | '/api/workspace/dispatch/files/$'
-    | '/api/workspace/missions/$id/live'
-    | '/api/workspace/missions/$id/pause'
-    | '/api/workspace/missions/$id/resume'
-    | '/api/workspace/missions/$id/start'
-    | '/api/workspace/missions/$id/status'
-    | '/api/workspace/missions/$id/stop'
-    | '/api/workspace/projects/$id/files'
-    | '/api/workspace/skills/$id/content'
-    | '/api/workspace/task-runs/$id/events'
-    | '/api/workspace/task-runs/$id/pause'
-    | '/api/workspace/task-runs/$id/retry'
-    | '/api/workspace/task-runs/$id/stop'
-    | '/api/workspace/teams/$id/approval-config'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2098,7 +1438,6 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   AgentSwarmRoute: typeof AgentSwarmRoute
   AgentsRoute: typeof AgentsRoute
-  BrowserRoute: typeof BrowserRoute
   ChannelsRoute: typeof ChannelsRoute
   ConductorRoute: typeof ConductorRoute
   ConnectRoute: typeof ConnectRoute
@@ -2108,17 +1447,10 @@ export interface RootRouteChildren {
   DebugRoute: typeof DebugRoute
   FilesRoute: typeof FilesRoute
   GatewayRoute: typeof GatewayRouteWithChildren
-  InstancesRoute: typeof InstancesRoute
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
-  MissionConsoleRoute: typeof MissionConsoleRoute
   NewRoute: typeof NewRoute
-  NewProjectRoute: typeof NewProjectRoute
   NodesRoute: typeof NodesRoute
-  PlanReviewRoute: typeof PlanReviewRoute
-  ProjectsRoute: typeof ProjectsRoute
-  ReviewRoute: typeof ReviewRoute
-  RunsRoute: typeof RunsRoute
   SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -2126,10 +1458,6 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   UsageRoute: typeof UsageRoute
   WizardRoute: typeof WizardRoute
-  WorkspaceRoute: typeof WorkspaceRoute
-  WorkspaceAgentsRoute: typeof WorkspaceAgentsRoute
-  WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
-  WorkspaceTeamsRoute: typeof WorkspaceTeamsRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
@@ -2181,7 +1509,7 @@ export interface RootRouteChildren {
   ApiUsageRoute: typeof ApiUsageRoute
   ApiUsageAnalyticsRoute: typeof ApiUsageAnalyticsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
-  ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
+  ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiCloudProvisionRoute: typeof ApiCloudProvisionRoute
@@ -2208,34 +1536,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/workspace-teams': {
-      id: '/workspace-teams'
-      path: '/workspace-teams'
-      fullPath: '/workspace-teams'
-      preLoaderRoute: typeof WorkspaceTeamsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/workspace-skills': {
-      id: '/workspace-skills'
-      path: '/workspace-skills'
-      fullPath: '/workspace-skills'
-      preLoaderRoute: typeof WorkspaceSkillsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/workspace-agents': {
-      id: '/workspace-agents'
-      path: '/workspace-agents'
-      fullPath: '/workspace-agents'
-      preLoaderRoute: typeof WorkspaceAgentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/workspace': {
-      id: '/workspace'
-      path: '/workspace'
-      fullPath: '/workspace'
-      preLoaderRoute: typeof WorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/wizard': {
       id: '/wizard'
       path: '/wizard'
@@ -2285,34 +1585,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/runs': {
-      id: '/runs'
-      path: '/runs'
-      fullPath: '/runs'
-      preLoaderRoute: typeof RunsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/review': {
-      id: '/review'
-      path: '/review'
-      fullPath: '/review'
-      preLoaderRoute: typeof ReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects': {
-      id: '/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof ProjectsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/plan-review': {
-      id: '/plan-review'
-      path: '/plan-review'
-      fullPath: '/plan-review'
-      preLoaderRoute: typeof PlanReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/nodes': {
       id: '/nodes'
       path: '/nodes'
@@ -2320,25 +1592,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NodesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/new-project': {
-      id: '/new-project'
-      path: '/new-project'
-      fullPath: '/new-project'
-      preLoaderRoute: typeof NewProjectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/new': {
       id: '/new'
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof NewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mission-console': {
-      id: '/mission-console'
-      path: '/mission-console'
-      fullPath: '/mission-console'
-      preLoaderRoute: typeof MissionConsoleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memory': {
@@ -2353,13 +1611,6 @@ declare module '@tanstack/react-router' {
       path: '/logs'
       fullPath: '/logs'
       preLoaderRoute: typeof LogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/instances': {
-      id: '/instances'
-      path: '/instances'
-      fullPath: '/instances'
-      preLoaderRoute: typeof InstancesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gateway': {
@@ -2423,13 +1674,6 @@ declare module '@tanstack/react-router' {
       path: '/channels'
       fullPath: '/channels'
       preLoaderRoute: typeof ChannelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/browser': {
-      id: '/browser'
-      path: '/browser'
-      fullPath: '/browser'
-      preLoaderRoute: typeof BrowserRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents': {
@@ -2873,104 +2117,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTasksIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workspace/teams': {
-      id: '/api/workspace/teams'
-      path: '/teams'
-      fullPath: '/api/workspace/teams'
-      preLoaderRoute: typeof ApiWorkspaceTeamsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/tasks': {
-      id: '/api/workspace/tasks'
-      path: '/tasks'
-      fullPath: '/api/workspace/tasks'
-      preLoaderRoute: typeof ApiWorkspaceTasksRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/task-runs': {
-      id: '/api/workspace/task-runs'
-      path: '/task-runs'
-      fullPath: '/api/workspace/task-runs'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/stats': {
-      id: '/api/workspace/stats'
-      path: '/stats'
-      fullPath: '/api/workspace/stats'
-      preLoaderRoute: typeof ApiWorkspaceStatsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/skills': {
-      id: '/api/workspace/skills'
-      path: '/skills'
-      fullPath: '/api/workspace/skills'
-      preLoaderRoute: typeof ApiWorkspaceSkillsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/projects': {
-      id: '/api/workspace/projects'
-      path: '/projects'
-      fullPath: '/api/workspace/projects'
-      preLoaderRoute: typeof ApiWorkspaceProjectsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/phases': {
-      id: '/api/workspace/phases'
-      path: '/phases'
-      fullPath: '/api/workspace/phases'
-      preLoaderRoute: typeof ApiWorkspacePhasesRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/missions': {
-      id: '/api/workspace/missions'
-      path: '/missions'
-      fullPath: '/api/workspace/missions'
-      preLoaderRoute: typeof ApiWorkspaceMissionsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/memory-files': {
-      id: '/api/workspace/memory-files'
-      path: '/memory-files'
-      fullPath: '/api/workspace/memory-files'
-      preLoaderRoute: typeof ApiWorkspaceMemoryFilesRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/events': {
-      id: '/api/workspace/events'
-      path: '/events'
-      fullPath: '/api/workspace/events'
-      preLoaderRoute: typeof ApiWorkspaceEventsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/decompose': {
-      id: '/api/workspace/decompose'
-      path: '/decompose'
-      fullPath: '/api/workspace/decompose'
-      preLoaderRoute: typeof ApiWorkspaceDecomposeRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/config': {
-      id: '/api/workspace/config'
-      path: '/config'
-      fullPath: '/api/workspace/config'
-      preLoaderRoute: typeof ApiWorkspaceConfigRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/checkpoints': {
-      id: '/api/workspace/checkpoints'
-      path: '/checkpoints'
-      fullPath: '/api/workspace/checkpoints'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/agents': {
-      id: '/api/workspace/agents'
-      path: '/agents'
-      fullPath: '/api/workspace/agents'
-      preLoaderRoute: typeof ApiWorkspaceAgentsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
     '/api/tasks/$taskId': {
       id: '/api/tasks/$taskId'
       path: '/api/tasks/$taskId'
@@ -3181,41 +2327,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayApprovalsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workspace/tasks/$id': {
-      id: '/api/workspace/tasks/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/tasks/$id'
-      preLoaderRoute: typeof ApiWorkspaceTasksIdRouteImport
-      parentRoute: typeof ApiWorkspaceTasksRoute
-    }
-    '/api/workspace/task-runs/adhoc': {
-      id: '/api/workspace/task-runs/adhoc'
-      path: '/adhoc'
-      fullPath: '/api/workspace/task-runs/adhoc'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsAdhocRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/projects/$id': {
-      id: '/api/workspace/projects/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/projects/$id'
-      preLoaderRoute: typeof ApiWorkspaceProjectsIdRouteImport
-      parentRoute: typeof ApiWorkspaceProjectsRoute
-    }
-    '/api/workspace/checkpoints/$id': {
-      id: '/api/workspace/checkpoints/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/checkpoints/$id'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsRoute
-    }
-    '/api/workspace/agents/$id': {
-      id: '/api/workspace/agents/$id'
-      path: '/$id'
-      fullPath: '/api/workspace/agents/$id'
-      preLoaderRoute: typeof ApiWorkspaceAgentsIdRouteImport
-      parentRoute: typeof ApiWorkspaceAgentsRoute
-    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -3236,160 +2347,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/cli-agents/$pid/kill'
       preLoaderRoute: typeof ApiCliAgentsPidKillRouteImport
       parentRoute: typeof ApiCliAgentsRoute
-    }
-    '/api/workspace/teams/$id/approval-config': {
-      id: '/api/workspace/teams/$id/approval-config'
-      path: '/$id/approval-config'
-      fullPath: '/api/workspace/teams/$id/approval-config'
-      preLoaderRoute: typeof ApiWorkspaceTeamsIdApprovalConfigRouteImport
-      parentRoute: typeof ApiWorkspaceTeamsRoute
-    }
-    '/api/workspace/task-runs/$id/stop': {
-      id: '/api/workspace/task-runs/$id/stop'
-      path: '/$id/stop'
-      fullPath: '/api/workspace/task-runs/$id/stop'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdStopRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/task-runs/$id/retry': {
-      id: '/api/workspace/task-runs/$id/retry'
-      path: '/$id/retry'
-      fullPath: '/api/workspace/task-runs/$id/retry'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdRetryRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/task-runs/$id/pause': {
-      id: '/api/workspace/task-runs/$id/pause'
-      path: '/$id/pause'
-      fullPath: '/api/workspace/task-runs/$id/pause'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdPauseRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/task-runs/$id/events': {
-      id: '/api/workspace/task-runs/$id/events'
-      path: '/$id/events'
-      fullPath: '/api/workspace/task-runs/$id/events'
-      preLoaderRoute: typeof ApiWorkspaceTaskRunsIdEventsRouteImport
-      parentRoute: typeof ApiWorkspaceTaskRunsRoute
-    }
-    '/api/workspace/skills/$id/content': {
-      id: '/api/workspace/skills/$id/content'
-      path: '/$id/content'
-      fullPath: '/api/workspace/skills/$id/content'
-      preLoaderRoute: typeof ApiWorkspaceSkillsIdContentRouteImport
-      parentRoute: typeof ApiWorkspaceSkillsRoute
-    }
-    '/api/workspace/projects/$id/files': {
-      id: '/api/workspace/projects/$id/files'
-      path: '/files'
-      fullPath: '/api/workspace/projects/$id/files'
-      preLoaderRoute: typeof ApiWorkspaceProjectsIdFilesRouteImport
-      parentRoute: typeof ApiWorkspaceProjectsIdRoute
-    }
-    '/api/workspace/missions/$id/stop': {
-      id: '/api/workspace/missions/$id/stop'
-      path: '/$id/stop'
-      fullPath: '/api/workspace/missions/$id/stop'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdStopRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/status': {
-      id: '/api/workspace/missions/$id/status'
-      path: '/$id/status'
-      fullPath: '/api/workspace/missions/$id/status'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdStatusRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/start': {
-      id: '/api/workspace/missions/$id/start'
-      path: '/$id/start'
-      fullPath: '/api/workspace/missions/$id/start'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdStartRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/resume': {
-      id: '/api/workspace/missions/$id/resume'
-      path: '/$id/resume'
-      fullPath: '/api/workspace/missions/$id/resume'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdResumeRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/pause': {
-      id: '/api/workspace/missions/$id/pause'
-      path: '/$id/pause'
-      fullPath: '/api/workspace/missions/$id/pause'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdPauseRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/missions/$id/live': {
-      id: '/api/workspace/missions/$id/live'
-      path: '/$id/live'
-      fullPath: '/api/workspace/missions/$id/live'
-      preLoaderRoute: typeof ApiWorkspaceMissionsIdLiveRouteImport
-      parentRoute: typeof ApiWorkspaceMissionsRoute
-    }
-    '/api/workspace/dispatch/files/$': {
-      id: '/api/workspace/dispatch/files/$'
-      path: '/dispatch/files/$'
-      fullPath: '/api/workspace/dispatch/files/$'
-      preLoaderRoute: typeof ApiWorkspaceDispatchFilesSplatRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/checkpoints/$id/verify-tsc': {
-      id: '/api/workspace/checkpoints/$id/verify-tsc'
-      path: '/verify-tsc'
-      fullPath: '/api/workspace/checkpoints/$id/verify-tsc'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdVerifyTscRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/revise': {
-      id: '/api/workspace/checkpoints/$id/revise'
-      path: '/revise'
-      fullPath: '/api/workspace/checkpoints/$id/revise'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdReviseRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/reject': {
-      id: '/api/workspace/checkpoints/$id/reject'
-      path: '/reject'
-      fullPath: '/api/workspace/checkpoints/$id/reject'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdRejectRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/diff': {
-      id: '/api/workspace/checkpoints/$id/diff'
-      path: '/diff'
-      fullPath: '/api/workspace/checkpoints/$id/diff'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdDiffRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve-and-pr': {
-      id: '/api/workspace/checkpoints/$id/approve-and-pr'
-      path: '/approve-and-pr'
-      fullPath: '/api/workspace/checkpoints/$id/approve-and-pr'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndPrRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve-and-merge': {
-      id: '/api/workspace/checkpoints/$id/approve-and-merge'
-      path: '/approve-and-merge'
-      fullPath: '/api/workspace/checkpoints/$id/approve-and-merge'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndMergeRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve-and-commit': {
-      id: '/api/workspace/checkpoints/$id/approve-and-commit'
-      path: '/approve-and-commit'
-      fullPath: '/api/workspace/checkpoints/$id/approve-and-commit'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
-    }
-    '/api/workspace/checkpoints/$id/approve': {
-      id: '/api/workspace/checkpoints/$id/approve'
-      path: '/approve'
-      fullPath: '/api/workspace/checkpoints/$id/approve'
-      preLoaderRoute: typeof ApiWorkspaceCheckpointsIdApproveRouteImport
-      parentRoute: typeof ApiWorkspaceCheckpointsIdRoute
     }
     '/api/gateway/approvals/$approvalId/$action': {
       id: '/api/gateway/approvals/$approvalId/$action'
@@ -3505,210 +2462,12 @@ const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
   ApiSessionsRouteChildren,
 )
 
-interface ApiWorkspaceAgentsRouteChildren {
-  ApiWorkspaceAgentsIdRoute: typeof ApiWorkspaceAgentsIdRoute
-}
-
-const ApiWorkspaceAgentsRouteChildren: ApiWorkspaceAgentsRouteChildren = {
-  ApiWorkspaceAgentsIdRoute: ApiWorkspaceAgentsIdRoute,
-}
-
-const ApiWorkspaceAgentsRouteWithChildren =
-  ApiWorkspaceAgentsRoute._addFileChildren(ApiWorkspaceAgentsRouteChildren)
-
-interface ApiWorkspaceCheckpointsIdRouteChildren {
-  ApiWorkspaceCheckpointsIdApproveRoute: typeof ApiWorkspaceCheckpointsIdApproveRoute
-  ApiWorkspaceCheckpointsIdApproveAndCommitRoute: typeof ApiWorkspaceCheckpointsIdApproveAndCommitRoute
-  ApiWorkspaceCheckpointsIdApproveAndMergeRoute: typeof ApiWorkspaceCheckpointsIdApproveAndMergeRoute
-  ApiWorkspaceCheckpointsIdApproveAndPrRoute: typeof ApiWorkspaceCheckpointsIdApproveAndPrRoute
-  ApiWorkspaceCheckpointsIdDiffRoute: typeof ApiWorkspaceCheckpointsIdDiffRoute
-  ApiWorkspaceCheckpointsIdRejectRoute: typeof ApiWorkspaceCheckpointsIdRejectRoute
-  ApiWorkspaceCheckpointsIdReviseRoute: typeof ApiWorkspaceCheckpointsIdReviseRoute
-  ApiWorkspaceCheckpointsIdVerifyTscRoute: typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
-}
-
-const ApiWorkspaceCheckpointsIdRouteChildren: ApiWorkspaceCheckpointsIdRouteChildren =
-  {
-    ApiWorkspaceCheckpointsIdApproveRoute:
-      ApiWorkspaceCheckpointsIdApproveRoute,
-    ApiWorkspaceCheckpointsIdApproveAndCommitRoute:
-      ApiWorkspaceCheckpointsIdApproveAndCommitRoute,
-    ApiWorkspaceCheckpointsIdApproveAndMergeRoute:
-      ApiWorkspaceCheckpointsIdApproveAndMergeRoute,
-    ApiWorkspaceCheckpointsIdApproveAndPrRoute:
-      ApiWorkspaceCheckpointsIdApproveAndPrRoute,
-    ApiWorkspaceCheckpointsIdDiffRoute: ApiWorkspaceCheckpointsIdDiffRoute,
-    ApiWorkspaceCheckpointsIdRejectRoute: ApiWorkspaceCheckpointsIdRejectRoute,
-    ApiWorkspaceCheckpointsIdReviseRoute: ApiWorkspaceCheckpointsIdReviseRoute,
-    ApiWorkspaceCheckpointsIdVerifyTscRoute:
-      ApiWorkspaceCheckpointsIdVerifyTscRoute,
-  }
-
-const ApiWorkspaceCheckpointsIdRouteWithChildren =
-  ApiWorkspaceCheckpointsIdRoute._addFileChildren(
-    ApiWorkspaceCheckpointsIdRouteChildren,
-  )
-
-interface ApiWorkspaceCheckpointsRouteChildren {
-  ApiWorkspaceCheckpointsIdRoute: typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-}
-
-const ApiWorkspaceCheckpointsRouteChildren: ApiWorkspaceCheckpointsRouteChildren =
-  {
-    ApiWorkspaceCheckpointsIdRoute: ApiWorkspaceCheckpointsIdRouteWithChildren,
-  }
-
-const ApiWorkspaceCheckpointsRouteWithChildren =
-  ApiWorkspaceCheckpointsRoute._addFileChildren(
-    ApiWorkspaceCheckpointsRouteChildren,
-  )
-
-interface ApiWorkspaceMissionsRouteChildren {
-  ApiWorkspaceMissionsIdLiveRoute: typeof ApiWorkspaceMissionsIdLiveRoute
-  ApiWorkspaceMissionsIdPauseRoute: typeof ApiWorkspaceMissionsIdPauseRoute
-  ApiWorkspaceMissionsIdResumeRoute: typeof ApiWorkspaceMissionsIdResumeRoute
-  ApiWorkspaceMissionsIdStartRoute: typeof ApiWorkspaceMissionsIdStartRoute
-  ApiWorkspaceMissionsIdStatusRoute: typeof ApiWorkspaceMissionsIdStatusRoute
-  ApiWorkspaceMissionsIdStopRoute: typeof ApiWorkspaceMissionsIdStopRoute
-}
-
-const ApiWorkspaceMissionsRouteChildren: ApiWorkspaceMissionsRouteChildren = {
-  ApiWorkspaceMissionsIdLiveRoute: ApiWorkspaceMissionsIdLiveRoute,
-  ApiWorkspaceMissionsIdPauseRoute: ApiWorkspaceMissionsIdPauseRoute,
-  ApiWorkspaceMissionsIdResumeRoute: ApiWorkspaceMissionsIdResumeRoute,
-  ApiWorkspaceMissionsIdStartRoute: ApiWorkspaceMissionsIdStartRoute,
-  ApiWorkspaceMissionsIdStatusRoute: ApiWorkspaceMissionsIdStatusRoute,
-  ApiWorkspaceMissionsIdStopRoute: ApiWorkspaceMissionsIdStopRoute,
-}
-
-const ApiWorkspaceMissionsRouteWithChildren =
-  ApiWorkspaceMissionsRoute._addFileChildren(ApiWorkspaceMissionsRouteChildren)
-
-interface ApiWorkspaceProjectsIdRouteChildren {
-  ApiWorkspaceProjectsIdFilesRoute: typeof ApiWorkspaceProjectsIdFilesRoute
-}
-
-const ApiWorkspaceProjectsIdRouteChildren: ApiWorkspaceProjectsIdRouteChildren =
-  {
-    ApiWorkspaceProjectsIdFilesRoute: ApiWorkspaceProjectsIdFilesRoute,
-  }
-
-const ApiWorkspaceProjectsIdRouteWithChildren =
-  ApiWorkspaceProjectsIdRoute._addFileChildren(
-    ApiWorkspaceProjectsIdRouteChildren,
-  )
-
-interface ApiWorkspaceProjectsRouteChildren {
-  ApiWorkspaceProjectsIdRoute: typeof ApiWorkspaceProjectsIdRouteWithChildren
-}
-
-const ApiWorkspaceProjectsRouteChildren: ApiWorkspaceProjectsRouteChildren = {
-  ApiWorkspaceProjectsIdRoute: ApiWorkspaceProjectsIdRouteWithChildren,
-}
-
-const ApiWorkspaceProjectsRouteWithChildren =
-  ApiWorkspaceProjectsRoute._addFileChildren(ApiWorkspaceProjectsRouteChildren)
-
-interface ApiWorkspaceSkillsRouteChildren {
-  ApiWorkspaceSkillsIdContentRoute: typeof ApiWorkspaceSkillsIdContentRoute
-}
-
-const ApiWorkspaceSkillsRouteChildren: ApiWorkspaceSkillsRouteChildren = {
-  ApiWorkspaceSkillsIdContentRoute: ApiWorkspaceSkillsIdContentRoute,
-}
-
-const ApiWorkspaceSkillsRouteWithChildren =
-  ApiWorkspaceSkillsRoute._addFileChildren(ApiWorkspaceSkillsRouteChildren)
-
-interface ApiWorkspaceTaskRunsRouteChildren {
-  ApiWorkspaceTaskRunsAdhocRoute: typeof ApiWorkspaceTaskRunsAdhocRoute
-  ApiWorkspaceTaskRunsIdEventsRoute: typeof ApiWorkspaceTaskRunsIdEventsRoute
-  ApiWorkspaceTaskRunsIdPauseRoute: typeof ApiWorkspaceTaskRunsIdPauseRoute
-  ApiWorkspaceTaskRunsIdRetryRoute: typeof ApiWorkspaceTaskRunsIdRetryRoute
-  ApiWorkspaceTaskRunsIdStopRoute: typeof ApiWorkspaceTaskRunsIdStopRoute
-}
-
-const ApiWorkspaceTaskRunsRouteChildren: ApiWorkspaceTaskRunsRouteChildren = {
-  ApiWorkspaceTaskRunsAdhocRoute: ApiWorkspaceTaskRunsAdhocRoute,
-  ApiWorkspaceTaskRunsIdEventsRoute: ApiWorkspaceTaskRunsIdEventsRoute,
-  ApiWorkspaceTaskRunsIdPauseRoute: ApiWorkspaceTaskRunsIdPauseRoute,
-  ApiWorkspaceTaskRunsIdRetryRoute: ApiWorkspaceTaskRunsIdRetryRoute,
-  ApiWorkspaceTaskRunsIdStopRoute: ApiWorkspaceTaskRunsIdStopRoute,
-}
-
-const ApiWorkspaceTaskRunsRouteWithChildren =
-  ApiWorkspaceTaskRunsRoute._addFileChildren(ApiWorkspaceTaskRunsRouteChildren)
-
-interface ApiWorkspaceTasksRouteChildren {
-  ApiWorkspaceTasksIdRoute: typeof ApiWorkspaceTasksIdRoute
-}
-
-const ApiWorkspaceTasksRouteChildren: ApiWorkspaceTasksRouteChildren = {
-  ApiWorkspaceTasksIdRoute: ApiWorkspaceTasksIdRoute,
-}
-
-const ApiWorkspaceTasksRouteWithChildren =
-  ApiWorkspaceTasksRoute._addFileChildren(ApiWorkspaceTasksRouteChildren)
-
-interface ApiWorkspaceTeamsRouteChildren {
-  ApiWorkspaceTeamsIdApprovalConfigRoute: typeof ApiWorkspaceTeamsIdApprovalConfigRoute
-}
-
-const ApiWorkspaceTeamsRouteChildren: ApiWorkspaceTeamsRouteChildren = {
-  ApiWorkspaceTeamsIdApprovalConfigRoute:
-    ApiWorkspaceTeamsIdApprovalConfigRoute,
-}
-
-const ApiWorkspaceTeamsRouteWithChildren =
-  ApiWorkspaceTeamsRoute._addFileChildren(ApiWorkspaceTeamsRouteChildren)
-
-interface ApiWorkspaceRouteChildren {
-  ApiWorkspaceAgentsRoute: typeof ApiWorkspaceAgentsRouteWithChildren
-  ApiWorkspaceCheckpointsRoute: typeof ApiWorkspaceCheckpointsRouteWithChildren
-  ApiWorkspaceConfigRoute: typeof ApiWorkspaceConfigRoute
-  ApiWorkspaceDecomposeRoute: typeof ApiWorkspaceDecomposeRoute
-  ApiWorkspaceEventsRoute: typeof ApiWorkspaceEventsRoute
-  ApiWorkspaceMemoryFilesRoute: typeof ApiWorkspaceMemoryFilesRoute
-  ApiWorkspaceMissionsRoute: typeof ApiWorkspaceMissionsRouteWithChildren
-  ApiWorkspacePhasesRoute: typeof ApiWorkspacePhasesRoute
-  ApiWorkspaceProjectsRoute: typeof ApiWorkspaceProjectsRouteWithChildren
-  ApiWorkspaceSkillsRoute: typeof ApiWorkspaceSkillsRouteWithChildren
-  ApiWorkspaceStatsRoute: typeof ApiWorkspaceStatsRoute
-  ApiWorkspaceTaskRunsRoute: typeof ApiWorkspaceTaskRunsRouteWithChildren
-  ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRouteWithChildren
-  ApiWorkspaceTeamsRoute: typeof ApiWorkspaceTeamsRouteWithChildren
-  ApiWorkspaceDispatchFilesSplatRoute: typeof ApiWorkspaceDispatchFilesSplatRoute
-}
-
-const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
-  ApiWorkspaceAgentsRoute: ApiWorkspaceAgentsRouteWithChildren,
-  ApiWorkspaceCheckpointsRoute: ApiWorkspaceCheckpointsRouteWithChildren,
-  ApiWorkspaceConfigRoute: ApiWorkspaceConfigRoute,
-  ApiWorkspaceDecomposeRoute: ApiWorkspaceDecomposeRoute,
-  ApiWorkspaceEventsRoute: ApiWorkspaceEventsRoute,
-  ApiWorkspaceMemoryFilesRoute: ApiWorkspaceMemoryFilesRoute,
-  ApiWorkspaceMissionsRoute: ApiWorkspaceMissionsRouteWithChildren,
-  ApiWorkspacePhasesRoute: ApiWorkspacePhasesRoute,
-  ApiWorkspaceProjectsRoute: ApiWorkspaceProjectsRouteWithChildren,
-  ApiWorkspaceSkillsRoute: ApiWorkspaceSkillsRouteWithChildren,
-  ApiWorkspaceStatsRoute: ApiWorkspaceStatsRoute,
-  ApiWorkspaceTaskRunsRoute: ApiWorkspaceTaskRunsRouteWithChildren,
-  ApiWorkspaceTasksRoute: ApiWorkspaceTasksRouteWithChildren,
-  ApiWorkspaceTeamsRoute: ApiWorkspaceTeamsRouteWithChildren,
-  ApiWorkspaceDispatchFilesSplatRoute: ApiWorkspaceDispatchFilesSplatRoute,
-}
-
-const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
-  ApiWorkspaceRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   ActivityRoute: ActivityRoute,
   AgentSwarmRoute: AgentSwarmRoute,
   AgentsRoute: AgentsRoute,
-  BrowserRoute: BrowserRoute,
   ChannelsRoute: ChannelsRoute,
   ConductorRoute: ConductorRoute,
   ConnectRoute: ConnectRoute,
@@ -3718,17 +2477,10 @@ const rootRouteChildren: RootRouteChildren = {
   DebugRoute: DebugRoute,
   FilesRoute: FilesRoute,
   GatewayRoute: GatewayRouteWithChildren,
-  InstancesRoute: InstancesRoute,
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
-  MissionConsoleRoute: MissionConsoleRoute,
   NewRoute: NewRoute,
-  NewProjectRoute: NewProjectRoute,
   NodesRoute: NodesRoute,
-  PlanReviewRoute: PlanReviewRoute,
-  ProjectsRoute: ProjectsRoute,
-  ReviewRoute: ReviewRoute,
-  RunsRoute: RunsRoute,
   SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -3736,10 +2488,6 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   UsageRoute: UsageRoute,
   WizardRoute: WizardRoute,
-  WorkspaceRoute: WorkspaceRoute,
-  WorkspaceAgentsRoute: WorkspaceAgentsRoute,
-  WorkspaceSkillsRoute: WorkspaceSkillsRoute,
-  WorkspaceTeamsRoute: WorkspaceTeamsRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,
@@ -3791,7 +2539,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUsageRoute: ApiUsageRoute,
   ApiUsageAnalyticsRoute: ApiUsageAnalyticsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
-  ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
+  ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiCloudProvisionRoute: ApiCloudProvisionRoute,

@@ -43,7 +43,6 @@ import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
-import { BrowserSidebarSection } from '@/components/browser-view/browser-sidebar-preview'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -614,7 +613,6 @@ export function AgentViewPanel() {
     statusLabel: string
   } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
-  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(false)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
   // Auto: expanded avatar when idle, compact when agents are working
@@ -1241,10 +1239,6 @@ export function AgentViewPanel() {
                   </section>
                 ) : null}
 
-                <BrowserSidebarSection
-                  expanded={browserPreviewExpanded}
-                  onExpandChange={setBrowserPreviewExpanded}
-                />
               </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar>

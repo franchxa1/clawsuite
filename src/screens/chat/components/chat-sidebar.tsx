@@ -11,7 +11,6 @@ import {
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
-  GlobeIcon,
   Home01Icon,
   ListViewIcon,
   Notification03Icon,
@@ -65,11 +64,6 @@ import {
 } from '@/components/ui/menu'
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
-import {
-  extractProject,
-  extractProjects,
-  type WorkspaceStats,
-} from '@/screens/projects/lib/workspace-types'
 
 function ThemeToggleMini() {
   const theme = useSettingsStore((state) => state.settings.theme)
@@ -168,99 +162,6 @@ type NavItemDef = {
   disabled?: boolean
   badge?: 'error-dot' | string | number
   dataTour?: string
-}
-
-type SidebarProjectShortcut = {
-  id: string
-  name: string
-  progress: number
-  pendingCount: number
-}
-
-export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
-  try {
-    const response = await fetch('/api/workspace/stats')
-    if (!response.ok) return null
-    return (await response.json()) as WorkspaceStats
-  } catch {
-    return null
-  }
-}
-
-export async function fetchWorkspaceProjectShortcuts(): Promise<SidebarProjectShortcut[]> {
-  const [projectsResponse, checkpointsResponse] = await Promise.all([
-    fetch('/api/workspace/projects'),
-    fetch('/api/workspace/checkpoints?status=pending'),
-  ])
-
-  if (!projectsResponse.ok) {
-    throw new Error(`Failed to load workspace projects (${projectsResponse.status})`)
-  }
-
-  const projects = extractProjects(await projectsResponse.json())
-  const pendingPayload = checkpointsResponse.ok ? await checkpointsResponse.json() : null
-  const pendingItems = Array.isArray((pendingPayload as Record<string, unknown> | null)?.checkpoints)
-    ? ((pendingPayload as Record<string, unknown>).checkpoints as Array<unknown>)
-    : Array.isArray((pendingPayload as Record<string, unknown> | null)?.items)
-      ? ((pendingPayload as Record<string, unknown>).items as Array<unknown>)
-      : []
-
-  const pendingByProjectName = pendingItems.reduce<Record<string, number>>(
-    (accumulator, item) => {
-      const record = toRecord(item)
-      const projectName =
-        typeof record?.project_name === 'string' ? record.project_name : null
-      if (!projectName) return accumulator
-      accumulator[projectName] = (accumulator[projectName] ?? 0) + 1
-      return accumulator
-    },
-    {},
-  )
-
-  const activeProjects = projects.filter((project) => {
-    const normalizedStatus = project.status.toLowerCase()
-    return !['completed', 'done', 'failed'].includes(normalizedStatus)
-  })
-  const shortcutProjects = (activeProjects.length > 0 ? activeProjects : projects).slice(
-    0,
-    5,
-  )
-
-  const details = await Promise.all(
-    shortcutProjects.map(async (project) => {
-      const response = await fetch(
-        `/api/workspace/projects/${encodeURIComponent(project.id)}`,
-      )
-      if (!response.ok) return null
-      return extractProject(await response.json())
-    }),
-  )
-
-  return shortcutProjects.map((project, index) => {
-    const detail = details[index]
-    const tasks =
-      detail?.phases.flatMap((phase) =>
-        phase.missions.flatMap((mission) => mission.tasks),
-      ) ?? []
-    const completedCount = tasks.filter((task) =>
-      ['completed', 'done'].includes(task.status.toLowerCase()),
-    ).length
-    const progress =
-      tasks.length > 0
-        ? Math.round((completedCount / tasks.length) * 100)
-        : project.status === 'completed' || project.status === 'done'
-          ? 100
-          : project.status === 'running' || project.status === 'active'
-            ? 50
-            : 0
-
-    return {
-      id: project.id,
-      name: project.name,
-      progress,
-      pendingCount: pendingByProjectName[project.name] ?? 0,
-    }
-  })
 }
 
 function NavItem({
@@ -646,7 +547,6 @@ function ChatSidebarComponent({
   const isAgentSwarmActive = pathname === '/agent-swarm'
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
   // Gateway
@@ -670,7 +570,6 @@ function ChatSidebarComponent({
     '/dashboard',
     '/agent-swarm',
     '/new',
-    '/browser',
     '/terminal',
     '/tasks',
     '/skills',
@@ -719,8 +618,8 @@ function ChatSidebarComponent({
     'openclaw-sidebar-suite-expanded',
     true,
   )
-  const [workspaceExpanded, toggleWorkspace] = usePersistedBool(
-    'openclaw-sidebar-workspace-expanded',
+  const [missionExpanded, toggleMission] = usePersistedBool(
+    'openclaw-sidebar-mission-expanded',
     true,
   )
   const [systemExpanded, toggleSystem] = usePersistedBool(
@@ -906,13 +805,6 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/browser',
-      icon: GlobeIcon,
-      label: 'Browser',
-      active: isBrowserActive,
-    },
-    {
-      kind: 'link',
       to: '/terminal',
       icon: ComputerTerminal01Icon,
       label: 'Terminal',
@@ -979,14 +871,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  const workspaceItems: NavItemDef[] = [
-    {
-      kind: 'link',
-      to: '/workspace',
-      icon: ListViewIcon,
-      label: 'Workspace',
-      active: pathname.startsWith('/workspace'),
-    },
+  const missionItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/conductor',
@@ -1240,16 +1125,16 @@ function ChatSidebarComponent({
 
           {/* WORKSPACE */}
           <SectionLabel
-            label="Workspace"
+            label="Mission"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
-            expanded={workspaceExpanded}
-            onToggle={toggleWorkspace}
+            expanded={missionExpanded}
+            onToggle={toggleMission}
           />
           <CollapsibleSection
-            expanded={workspaceExpanded || isCollapsed}
-            items={workspaceItems}
+            expanded={missionExpanded || isCollapsed}
+            items={missionItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
