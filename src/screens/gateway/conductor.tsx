@@ -698,7 +698,10 @@ export function Conductor() {
     ? `/api/preview-file?path=${encodeURIComponent(`${selectedHistoryOutputPath}/index.html`)}`
     : null
 
-  const selectedHistoryPreview = usePreviewAvailability(selectedHistoryPreviewUrl, !!conductor.selectedHistoryEntry)
+  // Skip preview probe for history entries — /tmp files are ephemeral and won't exist later.
+  // Only probe if the mission just completed (still in complete phase with matching output path).
+  const isLiveCompletePreview = phase === 'complete' && !!completePhaseProjectPath && selectedHistoryOutputPath === completePhaseProjectPath
+  const selectedHistoryPreview = usePreviewAvailability(selectedHistoryPreviewUrl, !!conductor.selectedHistoryEntry && isLiveCompletePreview)
   const previewState = usePreviewAvailability(previewUrl, phase === 'complete')
 
   const completedTaskOutputs = useMemo(() => {
