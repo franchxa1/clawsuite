@@ -420,11 +420,11 @@ function usePreviewAvailability(previewUrl: string | null, enabled: boolean) {
 
   useEffect(() => {
     if (!enabled || !previewUrl) return
-    const timer = window.setTimeout(() => setTimedOut(true), 10_000)
+    const timer = window.setTimeout(() => setTimedOut(true), 6_000)
     return () => window.clearTimeout(timer)
   }, [enabled, previewUrl])
 
-  const exhausted = enabled && !!previewUrl && (failedProbes >= 5 || timedOut)
+  const exhausted = enabled && !!previewUrl && (failedProbes >= 4 || timedOut)
 
   const probeQuery = useQuery({
     queryKey: ['conductor', 'preview-probe', previewUrl],
@@ -441,7 +441,7 @@ function usePreviewAvailability(previewUrl: string | null, enabled: boolean) {
     },
     enabled: enabled && !!previewUrl && !exhausted,
     retry: false,
-    refetchInterval: (query) => (query.state.data === true || exhausted ? false : 2_500),
+    refetchInterval: (query) => (query.state.data === true || exhausted ? false : 1_500),
     staleTime: 5_000,
   })
 
@@ -540,6 +540,7 @@ export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
   const [continueDraft, setContinueDraft] = useState('')
+  const [continueModalOpen, setContinueModalOpen] = useState(false)
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'failed'>('all')
@@ -590,6 +591,7 @@ export function Conductor() {
     conductor.resetMission()
     setGoalDraft('')
     setContinueDraft('')
+    setContinueModalOpen(false)
     setSelectedTaskId(null)
     setActivityPage(0)
   }
@@ -623,6 +625,7 @@ export function Conductor() {
     ].join('\n')
 
     setContinueDraft('')
+    setContinueModalOpen(false)
     await conductor.sendMission(combinedPrompt)
   }
 
@@ -799,6 +802,7 @@ export function Conductor() {
       conductor.streamText
     return truncateContinuationText(summarySource ?? '')
   }, [completeSummary, conductor.streamText, conductor.workerOutputs, conductor.workers])
+  const continuationModalPreview = useMemo(() => truncateContinuationText(continuationPreview, 200), [continuationPreview])
   const hasMissionHistory = conductor.missionHistory.length > 0
   const canResetSavedState = hasMissionHistory || conductor.hasPersistedMission
   const filteredHistory = (() => {
@@ -1022,19 +1026,21 @@ export function Conductor() {
         <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="w-full space-y-8">
             <div className="space-y-3 text-center">
-              <div className="flex items-center justify-between gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
-                  Conductor
-                  <span className="size-2 rounded-full bg-emerald-400" />
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
+                    Conductor
+                    <span className="size-2 rounded-full bg-emerald-400" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(true)}
+                    className="inline-flex items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
+                    aria-label="Open conductor settings"
+                  >
+                    <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.7} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  className="inline-flex items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                  aria-label="Open conductor settings"
-                >
-                  <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.7} />
-                </button>
               </div>
               <h1 className="text-2xl font-semibold tracking-tight text-[var(--theme-text)] md:text-4xl">
                 What should the team do next?
@@ -1464,6 +1470,15 @@ export function Conductor() {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  {!completePhaseProjectPath || !previewState.ready ? (
+                    <Button
+                      type="button"
+                      onClick={() => setContinueModalOpen(true)}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
+                    >
+                      Continue
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     onClick={handleNewMission}
@@ -1484,14 +1499,23 @@ export function Conductor() {
                       {completePhaseProjectPath.split('/').pop() || 'index.html'}
                     </p>
                   </div>
-                  <a
-                    href={previewUrl!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
-                  >
-                    Open in new tab ↗
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={previewUrl!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
+                    >
+                      Open in new tab ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setContinueModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
+                    >
+                      Continue
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
                   <iframe
@@ -1612,55 +1636,72 @@ export function Conductor() {
               )}
             </section>
 
-            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-5 shadow-[0_24px_80px_var(--theme-shadow)]">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Continue Mission</p>
-                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Want to iterate? Continue the mission with new instructions.</p>
-                </div>
-                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                  Context carried forward
-                </span>
-              </div>
-
-              {continuationPreview ? (
-                <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--theme-muted)]">Previous output summary</p>
-                  <p className="mt-2 text-sm text-[var(--theme-text)]">{continuationPreview}</p>
-                </div>
-              ) : null}
-
-              <form
-                className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void handleContinueMission()
-                }}
-              >
-                <input
-                  type="text"
-                  value={continueDraft}
-                  onChange={(event) => setContinueDraft(event.target.value)}
-                  placeholder="Continue with additional instructions..."
-                  disabled={conductor.isSending}
-                  className="min-w-0 flex-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted-2)] focus:border-[var(--theme-accent)] disabled:cursor-not-allowed disabled:opacity-60"
-                />
-                <button
-                  type="submit"
-                  disabled={!continueDraft.trim() || conductor.isSending}
-                  className={cn(
-                    'inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition-colors sm:min-w-[96px]',
-                    !continueDraft.trim() || conductor.isSending
-                      ? 'cursor-not-allowed border border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-60'
-                      : 'border border-[var(--theme-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft-strong)]',
-                  )}
-                >
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
-                  {conductor.isSending ? 'Sending' : 'Send'}
-                </button>
-              </form>
-            </section>
           </div>
+
+          {continueModalOpen ? (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-[color-mix(in_srgb,var(--theme-bg)_48%,transparent)] px-4 py-6 backdrop-blur-md"
+              onClick={() => setContinueModalOpen(false)}
+            >
+              <div
+                className="w-full max-w-md rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)] sm:p-6"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold tracking-tight text-[var(--theme-text)]">Continue Mission</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setContinueModalOpen(false)}
+                    className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-lg text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
+                    aria-label="Close continue mission dialog"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {continuationModalPreview ? (
+                  <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--theme-muted)]">Previous output summary</p>
+                    <p className="mt-2 text-sm text-[var(--theme-text)]">{continuationModalPreview}</p>
+                  </div>
+                ) : null}
+
+                <form
+                  className="mt-4 space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleContinueMission()
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={continueDraft}
+                    onChange={(event) => setContinueDraft(event.target.value)}
+                    placeholder="Continue with additional instructions..."
+                    disabled={conductor.isSending}
+                    className="w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted-2)] focus:border-[var(--theme-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={!continueDraft.trim() || conductor.isSending}
+                      className={cn(
+                        'inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition-colors sm:min-w-[96px]',
+                        !continueDraft.trim() || conductor.isSending
+                          ? 'cursor-not-allowed border border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-60'
+                          : 'border border-[var(--theme-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft-strong)]',
+                      )}
+                    >
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
+                      {conductor.isSending ? 'Sending' : 'Send'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
         </main>
       </div>
     )
