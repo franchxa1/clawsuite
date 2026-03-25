@@ -50,9 +50,20 @@ function normalizeSessions(
   )
     ? payload.sessions
     : []
-  const normalized = sessions.map((session) => {
+  const deduped = new Map<string, Record<string, unknown>>()
+
+  function readUpdatedAt(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+    return 0
+  }
+
+  sessions.forEach((session) => {
     const rawKey = session.key
-    const key = typeof rawKey === 'string' ? rawKey : ''
+    const key = typeof rawKey === 'string' ? rawKey.trim() : ''
     const rawFriendly = session.friendlyId
     const friendlyIdFromPayload =
       typeof rawFriendly === 'string' ? rawFriendly.trim() : ''
@@ -60,14 +71,34 @@ function normalizeSessions(
       friendlyIdFromPayload.length > 0
         ? friendlyIdFromPayload
         : deriveFriendlyIdFromKey(key)
-    return {
+    const normalizedSession: Record<string, unknown> = {
       ...session,
       key,
       friendlyId,
     }
+
+    const identity = key || friendlyId
+    if (!identity) {
+      deduped.set(randomUUID(), normalizedSession)
+      return
+    }
+
+    const existing = deduped.get(identity)
+    if (!existing) {
+      deduped.set(identity, normalizedSession)
+      return
+    }
+
+    const existingUpdatedAt = readUpdatedAt(existing.updatedAt)
+    const nextUpdatedAt = readUpdatedAt(normalizedSession.updatedAt)
+
+    deduped.set(
+      identity,
+      nextUpdatedAt >= existingUpdatedAt ? normalizedSession : existing,
+    )
   })
 
-  return { sessions: normalized }
+  return { sessions: Array.from(deduped.values()) }
 }
 
 export const Route = createFileRoute('/api/sessions')({

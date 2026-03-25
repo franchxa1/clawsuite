@@ -72,6 +72,12 @@ function summarizeTask(raw: string): string {
   return firstLine.slice(0, 60).trim() + (firstLine.length > 60 ? '…' : '')
 }
 
+function normalizeAgentTask(value: string): string {
+  const normalized = value.trim().replace(/\s+/g, ' ').toLowerCase()
+  if (!normalized || normalized === 'no task description') return ''
+  return normalized
+}
+
 function formatRuntimeLabel(runtimeSeconds: number): string {
   const clampedSeconds = Math.max(0, Math.floor(runtimeSeconds))
   const hours = Math.floor(clampedSeconds / 3600)
@@ -635,6 +641,30 @@ export function AgentViewPanel() {
     },
     [activeAgents],
   )
+  const representedTaskFingerprints = useMemo(() => {
+    const fingerprints = new Set<string>()
+    activeAgents.forEach((agent) => {
+      const task = normalizeAgentTask(agent.task)
+      if (task) fingerprints.add(task)
+    })
+    queuedAgents.forEach((agent) => {
+      const task = normalizeAgentTask(agent.description)
+      if (task) fingerprints.add(task)
+    })
+    historyAgents.forEach((agent) => {
+      const task = normalizeAgentTask(agent.description)
+      if (task) fingerprints.add(task)
+    })
+    return fingerprints
+  }, [activeAgents, historyAgents, queuedAgents])
+  const visibleCliAgents = useMemo(
+    () =>
+      cliAgents.filter((agent) => {
+        const task = normalizeAgentTask(agent.task)
+        return !task || !representedTaskFingerprints.has(task)
+      }),
+    [cliAgents, representedTaskFingerprints],
+  )
   const missionSessionIds = useMemo(
     () => new Set(missionActiveAgents.map((agent) => agent.id)),
     [missionActiveAgents],
@@ -858,7 +888,7 @@ export function AgentViewPanel() {
 
               {/* Center — title */}
               <h2 className="text-sm font-semibold text-primary-900">
-                Conductor
+                Agent View
               </h2>
 
               {/* Right — expand + close */}
@@ -1136,7 +1166,7 @@ export function AgentViewPanel() {
                   </LayoutGroup>
                 </section>}
 
-                {(cliAgentsQuery.isLoading || cliAgents.length > 0) ? (
+                {(cliAgentsQuery.isLoading || visibleCliAgents.length > 0) ? (
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                     <Collapsible
                       open={cliAgentsExpanded}
@@ -1156,7 +1186,7 @@ export function AgentViewPanel() {
                           ⚡ Active Agents
                         </CollapsibleTrigger>
                         <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                          {cliAgents.length}
+                          {visibleCliAgents.length}
                         </span>
                       </div>
                       <CollapsiblePanel contentClassName="pt-1">
@@ -1166,7 +1196,7 @@ export function AgentViewPanel() {
                               Scanning...
                             </p>
                           ) : null}
-                          {cliAgents.map(function renderCliAgent(agent) {
+                          {visibleCliAgents.map(function renderCliAgent(agent) {
                             const progressPct =
                               agent.status === 'finished'
                                 ? 100
@@ -1293,7 +1323,7 @@ export function AgentViewPanel() {
                       {activeCount}
                     </span>
                   </div>
-                  <h2 className="text-sm font-semibold text-primary-900">Conductor</h2>
+                  <h2 className="text-sm font-semibold text-primary-900">Agent View</h2>
                   <button
                     type="button"
                     onClick={() => setOpen(false)}

@@ -19,7 +19,6 @@ import {
   Search01Icon,
   ApiIcon,
   Settings01Icon,
-  ServerStack01Icon,
   SmartPhone01Icon,
   Task01Icon,
   UserGroupIcon,
@@ -545,7 +544,6 @@ function ChatSidebarComponent({
   const isSessionsActive = pathname === '/sessions'
   const isUsageActive = pathname === '/usage'
   const isCostsActive = pathname === '/costs'
-  const isInstancesActive = pathname === '/instances'
   const isAgentsActive = pathname === '/agents'
   const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
@@ -573,7 +571,6 @@ function ChatSidebarComponent({
   ]
   const gatewayRoutes = [
     '/channels',
-    '/instances',
     '/sessions',
     '/usage',
     '/agents',
@@ -870,13 +867,6 @@ function ChatSidebarComponent({
       icon: Chat01Icon,
       label: 'Channels',
       active: isChannelsActive,
-    },
-    {
-      kind: 'link',
-      to: '/instances',
-      icon: ServerStack01Icon,
-      label: 'Instances',
-      active: isInstancesActive,
     },
     {
       kind: 'link',

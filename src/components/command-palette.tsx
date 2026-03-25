@@ -12,13 +12,11 @@ import {
   CommandLineIcon,
   ComputerTerminal01Icon,
   Folder01Icon,
-  GlobeIcon,
   Home01Icon,
   ListViewIcon,
   Notification03Icon,
   PuzzleIcon,
   Settings01Icon,
-  UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import {
@@ -194,15 +192,6 @@ export function CommandPalette({
         onSelect: () => void navigate({ to: '/conductor' }),
       },
       {
-        id: 'screen-agent-hub',
-        group: 'Screens',
-        label: 'Conductor',
-        keywords: 'agent swarm orchestrator',
-        shortcut: 'Go',
-        icon: UserGroupIcon,
-        onSelect: () => void navigate({ to: '/conductor' }),
-      },
-      {
         id: 'screen-terminal',
         group: 'Screens',
         label: 'Terminal',
@@ -210,15 +199,6 @@ export function CommandPalette({
         shortcut: 'Go',
         icon: ComputerTerminal01Icon,
         onSelect: () => void navigate({ to: '/terminal' }),
-      },
-      {
-        id: 'screen-browser',
-        group: 'Screens',
-        label: 'Conductor',
-        keywords: 'mission control conductor',
-        shortcut: 'Go',
-        icon: GlobeIcon,
-        onSelect: () => void navigate({ to: '/conductor' }),
       },
       {
         id: 'screen-skills',

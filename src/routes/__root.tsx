@@ -94,8 +94,9 @@ const themeScript = `
     const isValidEnterpriseTheme =
       enterpriseTheme === 'ops-dark' ||
       enterpriseTheme === 'premium-dark' ||
-      enterpriseTheme === 'paper-light'
-    root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
+      enterpriseTheme === 'paper-light' ||
+      enterpriseTheme === 'sunset-brand'
+    root.classList.remove('paper-light', 'ops-dark', 'premium-dark', 'sunset-brand')
     if (isValidEnterpriseTheme) {
       root.setAttribute('data-theme', enterpriseTheme)
       root.classList.add(enterpriseTheme)

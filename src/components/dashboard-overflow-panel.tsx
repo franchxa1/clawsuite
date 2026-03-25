@@ -45,8 +45,8 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
 const GATEWAY_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: BotIcon, label: 'Conductor', to: '/conductor' },
-  { icon: Home01Icon, label: 'Workspace', to: '/workspace' },
-  { icon: Rocket01Icon, label: 'Conductor', to: '/conductor' },
+  { icon: Home01Icon, label: 'Dashboard', to: '/dashboard' },
+  { icon: Rocket01Icon, label: 'Agent View', to: '/agents' },
   { icon: ServerStack01Icon, label: 'Channels', to: '/channels' },
   { icon: ChartLineData02Icon, label: 'Costs', to: '/costs' },
 ]
