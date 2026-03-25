@@ -759,7 +759,9 @@ export function useConductorGateway() {
       // Best effort cleanup.
     }
 
-    clearMissionState()
+    // Transition to complete with error instead of clearing — so it shows as failed in activity
+    setStreamError('Mission stopped by user')
+    setPhase('complete')
   }
 
   const retryMission = async () => {
