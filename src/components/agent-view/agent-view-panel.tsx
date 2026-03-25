@@ -52,13 +52,6 @@ function getLastUserMessageBubbleElement(): HTMLElement | null {
   return nodes.item(nodes.length - 1)
 }
 
-function formatRelativeMs(msAgo: number): string {
-  const seconds = Math.max(0, Math.floor(msAgo / 1000))
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}m ago`
-}
-
 function summarizeTask(raw: string): string {
   if (!raw) return ''
   // Strip "exec " prefix and clean up codex command noise
@@ -591,7 +584,7 @@ export function AgentViewPanel() {
     showFloatingToggle,
     panelWidth,
     nowMs,
-    lastRefreshedMs,
+    lastRefreshedMs: _lastRefreshedMs,
     activeAgents,
     missionActiveAgents,
     nonMissionActiveAgents,
@@ -964,7 +957,7 @@ export function AgentViewPanel() {
                               statusCounts.thinking === 0 &&
                               statusCounts.failed === 0 &&
                               statusCounts.complete === 0
-                            ? 'No subagents'
+                            ? 'Waiting for agents'
                             : [
                                 statusCounts.running > 0 &&
                                   `${statusCounts.running} running`,
@@ -988,7 +981,7 @@ export function AgentViewPanel() {
                       <p>
                         {isLoading
                           ? ''
-                          : `synced ${formatRelativeMs(nowMs - lastRefreshedMs)}`}
+                          : ''}
                       </p>
                     </div>
                   </div>
@@ -1351,7 +1344,7 @@ export function AgentViewPanel() {
                         {isLoading
                           ? 'syncing...'
                           : activeNodes.length === 0 && queuedNodes.length === 0
-                            ? 'No subagents'
+                            ? 'Waiting for agents'
                             : `${activeNodes.length} active · ${queuedNodes.length} queued`}
                       </p>
                     </div>
