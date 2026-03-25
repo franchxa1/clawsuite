@@ -493,8 +493,8 @@ export function OfficeView({
     )
   }
 
-  const sceneW = 960
-  const sceneH = 560
+  const sceneW = 1040
+  const sceneH = 600
   const activeCount = agentRows.filter((r) => r.status === 'active').length
   const sessionCount = agentRows.filter((r) => Boolean(r.sessionKey)).length
   const phase = tick * 0.2
@@ -696,7 +696,7 @@ export function OfficeView({
         <svg
           viewBox={`0 0 ${sceneW} ${sceneH}`}
           className="absolute inset-0 h-full w-full"
-          preserveAspectRatio="xMidYMid slice"
+          preserveAspectRatio="xMidYMid meet"
           aria-hidden
         >
           {/* Floor zones */}
