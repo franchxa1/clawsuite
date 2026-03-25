@@ -366,11 +366,18 @@ export function Conductor() {
     queryKey: ['conductor', 'preview-probe', previewUrl],
     queryFn: async () => {
       if (!previewUrl) return false
-      const res = await fetch(previewUrl, { method: 'HEAD' })
-      return res.ok
+      try {
+        const res = await fetch(previewUrl)
+        if (!res.ok) return false
+        // Check it's actually HTML, not an error page
+        const text = await res.text()
+        return text.length > 20 && (text.includes('<') || text.includes('html'))
+      } catch {
+        return false
+      }
     },
     enabled: !!previewUrl && phase === 'complete',
-    refetchInterval: (query) => (query.state.data === true ? false : 2_000),
+    refetchInterval: (query) => (query.state.data === true ? false : 2_500),
     staleTime: 5_000,
   })
 
