@@ -84,5 +84,13 @@
     "vite": "^7.1.7",
     "vitest": "^3.0.5",
     "web-vitals": "^5.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "@electron/rebuild",
+      "esbuild",
+      "lightningcss"
+    ]
   }
 }

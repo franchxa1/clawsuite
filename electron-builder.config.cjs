@@ -7,6 +7,8 @@ module.exports = {
   productName: 'ClawSuite',
   copyright: 'Copyright © 2026 ClawSuite',
 
+  icon: 'assets/icon',
+
   directories: {
     output: 'release',
     buildResources: 'assets',

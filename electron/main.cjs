@@ -118,51 +118,92 @@ function startLocalServer(_gatewayUrl) {
             } catch { /* not running */ }
         }
 
-        // Start the bundled production server (electron/prod-server.cjs)
-        const prodServerPath = (0, path_1.join)(__dirname, 'prod-server.cjs');
-        if (!(0, fs_1.existsSync)(prodServerPath)) {
-            console.error('[ClawSuite] prod-server.cjs not found');
-            return reject(new Error('Production server not found'));
-        }
+        // Start an inline HTTP server serving the SSR build
+        const http = require('http');
+        const DIST_CLIENT = (0, path_1.join)(__dirname, '..', 'dist', 'client');
+        const BUNDLED_SERVER = (0, path_1.join)(__dirname, 'server-bundle.mjs');
 
-        console.log(`[ClawSuite] Starting production server on port ${PROD_SERVER_PORT}...`);
-        appProcess = (0, child_process_1.spawn)(process.execPath, [prodServerPath], {
-            env: { ...process.env, PORT: String(PROD_SERVER_PORT) },
-            stdio: 'pipe',
-        });
+        const MIME_TYPES = {
+            '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+            '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+            '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webp': 'image/webp',
+            '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+            '.webmanifest': 'application/manifest+json', '.gif': 'image/gif',
+        };
 
-        let started = false;
-        const timeout = setTimeout(() => {
-            if (!started) {
-                started = true;
+        console.log(`[ClawSuite] Starting inline SSR server on port ${PROD_SERVER_PORT}...`);
+
+        import(`file://${BUNDLED_SERVER}`).then((serverModule) => {
+            const serverBuild = serverModule.default;
+
+            const server = http.createServer(async (req, res) => {
+                const url = req.url || '/';
+                const pathname = url.split('?')[0];
+
+                // Serve static files from dist/client
+                if (pathname !== '/' && !pathname.startsWith('/api/')) {
+                    const filePath = (0, path_1.join)(DIST_CLIENT, pathname);
+                    if ((0, fs_1.existsSync)(filePath) && (0, fs_1.statSync)(filePath).isFile()) {
+                        const ext = (0, path_1.extname)(filePath);
+                        const mime = MIME_TYPES[ext] || 'application/octet-stream';
+                        const content = (0, fs_1.readFileSync)(filePath);
+                        res.writeHead(200, {
+                            'Content-Type': mime,
+                            'Cache-Control': pathname.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+                        });
+                        res.end(content);
+                        return;
+                    }
+                }
+
+                // SSR
+                try {
+                    const headers = new Headers();
+                    for (const [key, value] of Object.entries(req.headers)) {
+                        if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+                    }
+                    const fullUrl = `http://127.0.0.1:${PROD_SERVER_PORT}${url}`;
+                    const webRequest = new Request(fullUrl, {
+                        method: req.method,
+                        headers,
+                        body: req.method !== 'GET' && req.method !== 'HEAD'
+                            ? await new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); })
+                            : undefined,
+                        duplex: 'half',
+                    });
+                    const webResponse = await serverBuild.fetch(webRequest);
+                    const resHeaders = {};
+                    webResponse.headers.forEach((v, k) => { resHeaders[k] = v; });
+                    res.writeHead(webResponse.status, webResponse.statusText || '', resHeaders);
+                    if (webResponse.body) {
+                        const reader = webResponse.body.getReader();
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            res.write(value);
+                        }
+                    }
+                    res.end();
+                } catch (err) {
+                    console.error('[ClawSuite] SSR error:', err);
+                    res.writeHead(500, { 'Content-Type': 'text/plain' });
+                    res.end('Internal Server Error');
+                }
+            });
+
+            server.listen(PROD_SERVER_PORT, '127.0.0.1', () => {
                 localServerPort = PROD_SERVER_PORT;
+                console.log(`[ClawSuite] SSR server ready on port ${PROD_SERVER_PORT}`);
                 resolve(PROD_SERVER_PORT);
-            }
-        }, 10000);
+            });
 
-        appProcess.stdout?.on('data', (data) => {
-            const output = data.toString();
-            console.log('[prod-server]', output.trim());
-            if (!started && output.includes('listening')) {
-                started = true;
-                clearTimeout(timeout);
-                localServerPort = PROD_SERVER_PORT;
-                console.log(`[ClawSuite] Production server ready on port ${PROD_SERVER_PORT}`);
-                resolve(PROD_SERVER_PORT);
-            }
-        });
-
-        appProcess.stderr?.on('data', (data) => {
-            console.error('[prod-server-err]', data.toString().trim());
-        });
-
-        appProcess.on('error', (err) => {
-            console.error('[ClawSuite] Production server failed:', err);
-            if (!started) {
-                started = true;
-                clearTimeout(timeout);
+            server.on('error', (err) => {
+                console.error('[ClawSuite] SSR server failed:', err);
                 reject(err);
-            }
+            });
+        }).catch((err) => {
+            console.error('[ClawSuite] Failed to load server bundle:', err);
+            reject(err);
         });
     });
 }
