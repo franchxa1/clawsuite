@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { SessionsScreen } from '@/screens/gateway/sessions-screen'
 
 export const Route = createFileRoute('/sessions')({
+  ssr: false,
   component: function SessionsRoute() {
     usePageTitle('Sessions')
     return <SessionsScreen />

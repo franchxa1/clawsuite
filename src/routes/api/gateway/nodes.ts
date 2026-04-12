@@ -17,8 +17,8 @@ export const Route = createFileRoute('/api/gateway/nodes')({
             {},
           )
           return json({ ok: true, data: result })
-        } catch (err) {
-          console.error('gateway nodes.list failed:', err)
+        } catch {
+          // nodes.list may not exist on all gateway versions — degrade silently
           return json({ ok: true, data: { nodes: [] } })
         }
       },

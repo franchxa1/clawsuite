@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
+  ssr: false,
   beforeLoad: function redirectToWorkspace() {
     // First launch: redirect to setup wizard if gateway not configured
     if (typeof window !== 'undefined') {

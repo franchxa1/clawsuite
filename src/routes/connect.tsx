@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { CodeBlock } from '../components/prompt-kit/code-block'
 
 export const Route = createFileRoute('/connect')({
+  ssr: false,
   component: ConnectRoute,
 })
 

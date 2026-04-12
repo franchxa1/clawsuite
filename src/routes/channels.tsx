@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { ChannelsScreen } from '@/screens/gateway/channels-screen'
 
 export const Route = createFileRoute('/channels')({
+  ssr: false,
   component: function ChannelsRoute() {
     usePageTitle('Channels')
     return <ChannelsScreen />

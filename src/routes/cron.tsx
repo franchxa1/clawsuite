@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { CronManagerScreen } from '@/screens/cron/cron-manager-screen'
 
 export const Route = createFileRoute('/cron')({
+  ssr: false,
   component: function CronRoute() {
     usePageTitle('Cron Manager')
     return <CronManagerScreen />

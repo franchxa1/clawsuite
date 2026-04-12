@@ -3,6 +3,7 @@ import { TasksScreen } from '@/screens/tasks/tasks-screen'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/tasks')({
+  ssr: false,
   component: function TasksRoute() {
     usePageTitle('Tasks')
     return <TasksScreen />

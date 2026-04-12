@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { AgentsScreen } from '@/screens/gateway/agents-screen'
 
 export const Route = createFileRoute('/agents')({
+  ssr: false,
   component: function AgentsRoute() {
     usePageTitle('Agents')
     return <AgentsScreen variant="registry" />

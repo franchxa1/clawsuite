@@ -3,6 +3,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { AgentsScreen } from '@/screens/gateway/agents-screen'
 
 export const Route = createFileRoute('/agent-swarm')({
+  ssr: false,
   component: function AgentSwarmRoute() {
     usePageTitle('Conductor')
     return <AgentsScreen />

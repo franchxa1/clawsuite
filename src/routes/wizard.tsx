@@ -4,6 +4,7 @@ import { GatewaySetupWizard } from '@/components/gateway-setup-wizard'
 import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 
 export const Route = createFileRoute('/wizard')({
+  ssr: false,
   component: WizardPage,
 })
 

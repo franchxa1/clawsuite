@@ -4,6 +4,7 @@ import { GatewayConnectionSetupForm } from '@/components/gateway-connection-bann
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/dashboard')({
+  ssr: false,
   component: function DashboardRoute() {
     usePageTitle('Dashboard')
     return <DashboardScreen />
