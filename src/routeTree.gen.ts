@@ -16,6 +16,7 @@ import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionsRouteImport } from './routes/sessions'
+import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -159,6 +160,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SessionsRoute = SessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OperationsRoute = OperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NodesRoute = NodesRouteImport.update({
@@ -729,6 +735,7 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
+  '/operations': typeof OperationsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -847,6 +854,7 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
+  '/operations': typeof OperationsRoute
   '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
@@ -965,6 +973,7 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
+  '/operations': typeof OperationsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1085,6 +1094,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
+    | '/operations'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1203,6 +1213,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
+    | '/operations'
     | '/sessions'
     | '/skills'
     | '/tasks'
@@ -1320,6 +1331,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
+    | '/operations'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1439,6 +1451,7 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
   NodesRoute: typeof NodesRoute
+  OperationsRoute: typeof OperationsRoute
   SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -1570,6 +1583,13 @@ declare module '@tanstack/react-router' {
       path: '/sessions'
       fullPath: '/sessions'
       preLoaderRoute: typeof SessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/operations': {
+      id: '/operations'
+      path: '/operations'
+      fullPath: '/operations'
+      preLoaderRoute: typeof OperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nodes': {
@@ -2461,6 +2481,7 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
   NodesRoute: NodesRoute,
+  OperationsRoute: OperationsRoute,
   SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
